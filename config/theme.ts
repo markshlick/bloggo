@@ -66,15 +66,13 @@ const theme: Theme = {
         Wave: {
           width: ['100%', 'calc(100vw - 60px)'],
           marginTop: '40px',
-          marginLeft: [0, 'calc(50% - 50vw + 30px)'],
+          marginLeft: ['calc(50% - 50vw + 30px)'],
           marginBottom: '40px',
           position: 'relative',
           display: ['block', 'flex'],
         },
         ScrollerContainer: {
           flex: 1,
-          // paddingLeft: [0, '50px'],
-          // paddingTop: ['50px', 0],
         },
         ScrollerStep: {
           position: 'relative',
@@ -91,11 +89,11 @@ const theme: Theme = {
         },
         StickerContainer: {
           width: ['100vw', '60%'],
-          // marginLeft: ['calc(60% - 50vw)', 0],
           position: ['sticky', 'static'],
           top: [0, 'auto'],
           zIndex: [1, 'auto'],
           height: ['50vh', 'auto'],
+          marginLeft: '-16px',
         },
         Sticker: {
           position: ['static', 'sticky'],

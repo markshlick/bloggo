@@ -2,7 +2,7 @@ import URL, { UrlObject } from 'url';
 
 export const hostname = 'mrk.cool';
 
-export const title = 'mark:website';
+export const title = 'mark shlick';
 
 export const rssFeedPath = '/rss.xml';
 

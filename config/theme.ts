@@ -20,8 +20,8 @@ const link: NonNullable<Theme['styles']>['a'] = {
 const theme: Theme = {
   space: [0, 4, 8, 16, 32, 64, 128, 256, 512],
   fonts: {
-    body: '"Helvetica Neue", Arial, system-ui, sans-serif',
-    heading: '"Avenir Next", system-ui, sans-serif',
+    body: 'Helvetica, -apple-system, sans-serif',
+    heading: 'Nunito Sans, sans-serif',
     monospace: 'Menlo, monospace',
   },
   fontSizes: [12, 14, 16, 20, 24, 32, 48, 64, 96],
@@ -57,7 +57,13 @@ const theme: Theme = {
   sizes: { container: 720 },
   links: {
     big: {
+      fontFamily: 'heading',
       fontSize: 4,
+      ...link,
+    },
+    nav: {
+      fontFamily: 'heading',
+      fontSize: 3,
       ...link,
     },
   },

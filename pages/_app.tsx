@@ -24,7 +24,9 @@ export default class App extends NextApp {
                 </Link>
               </Box>
               <Box>
-                <Link to={Pages.about()}>about me</Link>
+                <Link variant="nav" to={Pages.about()}>
+                  about me
+                </Link>
               </Box>
             </Flex>
             <Component {...pageProps} />

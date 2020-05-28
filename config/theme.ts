@@ -9,11 +9,11 @@ const link: NonNullable<Theme['styles']>['a'] = {
   transition: 'all 200ms',
   '@media (hover: hover)': {
     '&:hover': {
-      backgroundColor: 'pink',
+      backgroundColor: 'highlightMuted',
     },
   },
   '&:active': {
-    backgroundColor: 'pink',
+    backgroundColor: 'highlightMuted',
   },
 };
 
@@ -40,6 +40,7 @@ const theme: Theme = {
     primary: '#11e',
     secondary: '#c0c',
     highlight: '#e0e',
+    highlightMuted: 'pink',
     muted: '#f6f6ff',
     modes: {
       dark: {
@@ -49,6 +50,7 @@ const theme: Theme = {
         secondary: '#0cf',
         highlight: '#f0c',
         muted: '#011',
+        highlightMuted: '#011',
       },
     },
   },

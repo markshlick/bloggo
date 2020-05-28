@@ -7,7 +7,12 @@ const link: NonNullable<Theme['styles']>['a'] = {
   borderRadius: 3,
   fontWeight: 'bold',
   transition: 'all 200ms',
-  '&:hover': {
+  '@media (hover: hover)': {
+    '&:hover': {
+      backgroundColor: 'pink',
+    },
+  },
+  '&:active': {
     backgroundColor: 'pink',
   },
 };
@@ -48,21 +53,6 @@ const theme: Theme = {
     },
   },
   sizes: { container: 720 },
-  cards: {
-    primary: {
-      position: 'relative',
-      bottom: '0px',
-      backgroundColor: 'background',
-      padding: 3,
-      borderRadius: 4,
-      boxShadow: '0 3px 6px rgba(0, 0, 0, 0.125)',
-      transition: 'bottom 200ms, box-shadow 200ms',
-      '&:hover': {
-        bottom: '2px',
-        boxShadow: '0 3px 6px rgba(0, 0, 0, 0.25)',
-      },
-    },
-  },
   links: {
     big: {
       fontSize: 4,

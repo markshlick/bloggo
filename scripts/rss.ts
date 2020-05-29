@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import RSS from 'rss';
 import { getPostsIndex } from 'helpers/blogPosts';
-import { title, url, rssFeedPath } from 'config/site';
+import { title, url, rssFeedPath, rssFileName } from 'config/site';
 
 const outputPath = './.next/static/';
 
@@ -27,5 +27,5 @@ export default async function generate() {
   });
 
   const rss = feed.xml({ indent: true });
-  await fs.promises.writeFile(path.join(outputPath, rssFeedPath), rss);
+  await fs.promises.writeFile(path.join(outputPath, rssFileName), rss);
 }

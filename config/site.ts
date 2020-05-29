@@ -4,7 +4,9 @@ export const hostname = 'mrk.cool';
 
 export const title = 'mark shlick';
 
-export const rssFeedPath = '/_next/static/rss.xml';
+export const rssFileName = 'rss.xml';
+
+export const rssFeedPath = `/_next/static/${rssFileName}`;
 
 export const fathomSiteId = 'PXLGGGJK';
 

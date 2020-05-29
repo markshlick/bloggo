@@ -4,7 +4,7 @@ import RSS from 'rss';
 import { getPostsIndex } from 'helpers/blogPosts';
 import { title, url, rssFeedPath } from 'config/site';
 
-const defaultOutputPath = '.next/static/';
+const defaultOutputPath = '../.next/static/';
 
 export default async function generate(outputPath = defaultOutputPath) {
   const blogPosts = await getPostsIndex();

@@ -1,5 +1,7 @@
 import URL, { UrlObject } from 'url';
 
+export const moji = '🌲';
+
 export const hostname = 'mrk.cool';
 
 export const title = 'mark shlick';

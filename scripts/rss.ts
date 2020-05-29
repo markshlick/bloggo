@@ -26,10 +26,6 @@ export default async function generate(outputPath = defaultOutputPath) {
     });
   });
 
-  if (!fs.existsSync(defaultOutputPath)) {
-    await fs.promises.mkdir(defaultOutputPath, { recursive: true });
-  }
-
   const rss = feed.xml({ indent: true });
-  fs.writeFileSync(path.join(outputPath, rssFeedPath), rss);
+  await fs.promises.writeFile(path.join(outputPath, rssFeedPath), rss);
 }

@@ -4,21 +4,10 @@ const rehypeWavesPlugin = require('rehype-waves');
 const withMdx = require('@next/mdx');
 
 const rssFeedFilePath = './scripts/rss.ts';
-const rssFeedOutputFilePath = 'rss.xml';
 
 function withRss(nextConf) {
   return {
     ...nextConf,
-    experimental: {
-      rewrites() {
-        return [
-          {
-            source: `/${rssFeedOutputFilePath}`,
-            destination: `/_next/static/${rssFeedOutputFilePath}`,
-          },
-        ];
-      },
-    },
     webpack: (config, { dev, isServer }) => {
       if (isServer && !dev) {
         const originalEntry = config.entry;

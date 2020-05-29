@@ -1,5 +1,5 @@
 import Document, { Html, Head, Main, NextScript, DocumentContext } from 'next/document';
-import { title, rssFeedPath } from 'config/site';
+import { rssFeedPath } from 'config/site';
 
 class MyDocument extends Document {
   static async getInitialProps(ctx: DocumentContext) {

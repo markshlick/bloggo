@@ -1,0 +1,110 @@
+export const meta = {
+  pub: true,
+  title: 'My publishing stack [WIP]',
+  date: '2020-05-29T20:43:33Z',
+  tags: ['meta', 'code'],
+};
+
+<h1>{meta.title}</h1>
+
+Welcome to my over-engineered blogging platform!
+
+---
+
+### ⚡️ The framework: Next.js
+
+Next is **dope**. I can see myself using it for just about any frontend project.
+
+For starters, the dev environment is 🔥fire. 🔥 You get quick, efficient builds, fast universal hot reloading, and graceful error messages.
+
+The PHP-style filesystem-based routing combined with the `getStaticProps`/`getStaticPaths`/`getServerSideProps` abstraction provided a frictionless dev experience that worked with everything I threw at it (more on that below).
+
+### 🖋 Writing in MDX
+
+Blog posts are written in [MDX][mdx] and 🚀build using [@next/mdx][next-mdx]. It's pretty frickin dope, and lets me add dynamic content to my posts effortlessly. More on this in the future.
+
+### 🛰 Hosting: ~~Now~~ ~~ZEIT~~ _Vercel_
+
+Given my positive experience with Next.js, I decided to take a break from Netlify and try out Vercel's hosting.
+
+Here's what I like so far:
+
+- The workflow. Not only do I get prod auto-deploys - I get _preview deploys for all my branches_. They're super fast, too!
+- Zero-config support for rendeering SPA, static, and SSR. This is such a killer feature.
+- Easy serverless lambdas.
+- Wiring up my domain name was a breeze.
+
+Things they could improve:
+
+- The name. Sorry friends, Zeit was waaay cooler.
+- **Docs.** They're fine if you just want to use Next.js - but it wasn't obvious how to use Vercel as a more generic platform. I had to dig around for a while before finding an [example][vercel-svelte] that showed mee how to do non-Next.js SSR.
+- I wish Vercel provided something like [Netlify's server-side analytics][netlify-analytice] for static pages.
+
+---
+
+## Implementation
+
+### ✨ Building index and collection pages the static+dynamic way
+
+One of my favorite features of Next.js is it's out-of-the-box flexibility with imports - for instance, in my home page's `getStaticProps`, I [scan a directory for all MDX files with `fs`, dynamically `require` them , and aggregate the exported metadata][magic-imports] - then Next.js takes care of generating all the static content!
+
+### 📚 RSS
+
+Generating a static RSS feed was the trickiest part of the setup. Like the index page, it takes a filesystem-based approach to import and collate all my posts - but there was one snag - Next.js doesn't generate non-HTML content.
+
+I had to [patch][rss-config] my `next.config.js` and add an additional [build step][build-rss] (thanks to the Vercel team for [demonstrating][vercel-rss-config] how).
+
+This workaround could have been avoided by adding some way of specifying MIME types for static pages to Next.js. You can already do this with SSR pages by modifying the response headers, but since static pages don't have a `res` object, maybe you could specify it in an export.
+
+```ts
+export mimeType = 'application/xml';
+```
+
+Alternatively, you could also express non-HTML content with a compound file extension - something like `feed.xml.ts`.
+
+---
+
+## Tooling
+
+### 🤓 TypeScript (and it's sidekick, VSCode)
+
+_Isn't that overkill for a small project?_ I'd say no - or at least not yet.
+
+Given the lack of complexity of the project, I rarely have to write my own type defs, plus all my modules from NPM provide their own. This lack of maintenance overhead gives me a ton of power at very little cost. Auto-complete and auto-import in VSCode are a dream to work with. (_And #yolo `any` is always there if I need to move fast_ 😉)
+
+#### Absolute imports
+
+This is a small win I get from TS that brings me a ton of joy after years of dealing with relative imports in Node.js. By specifying a `basePath` in your `tsconfig.json`, your import statements can be relative to the base patch instead of the current file! (e.g. `utils/data/fetch` instead of `../../../../utils/data/fetch`) VSCode even ships with intellisense support for basePaths.
+
+### 📐Theme UI
+
+This was my first time trying out [jxnblk's][jxnblk] latest toolkit [Theme UI][theme-ui], and I'm pretty satisfied so far. It provides a set of core components with sane defaults, plus the ability ot quickly override them with `sx`. I especially appreciated the rich documentation (and [recipes][recipes]).
+
+### 🌊 Waves
+
+_[More on this soon!]_
+
+<!-- #### react-live -->
+
+---
+
+## Some more features I'm working on
+
+- Different page layout and content types
+- Tags, categories and search
+- Comments/social
+- Automated syndication
+- SEO optimizations for that sweet sweet organic traffic
+- `#dark-mode`
+
+[mdx]: https://mdxjs.com/
+[next-mdx]: https://github.com/vercel/next.js/tree/master/packages/next-mdx
+[vercel-svelte]: https://github.com/vercel/vercel/blob/5608a4c42cc9257f10ca2287466c6849eb79853b/examples/svelte/package.json#L21
+[netlify-analytics]: https://www.netlify.com/products/analytics/
+[magic-imports]: https://github.com/markshlick/mrk.cool/blob/12ada80d07d56332447db34c45c715fb9aa893f9/helpers/blogPosts.ts#L23-L33
+[rss-config]: https://github.com/markshlick/mrk.cool/blob/12ada80d07d56332447db34c45c715fb9aa893f9/next.config.js#L8-L25
+[build-rss]: https://github.com/markshlick/mrk.cool/blob/12ada80d07d56332447db34c45c715fb9aa893f9/package.json#L7-L8
+[vercel-rss-config]: https://github.com/vercel/next-site/blob/26dcb1f6832b08d5ea30dcd6bcb854ed98a41528/next.config.js#L183-L203
+[jxnblk]: https://jxnblk.com/
+[theme-ui]: https://theme-ui.com/
+[recipes]: https://theme-ui.com/recipes

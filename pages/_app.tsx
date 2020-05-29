@@ -24,8 +24,8 @@ export default function App({ Component, pageProps }: AppProps) {
         <title>{title}</title>
       </Head>
       <ThemeProvider theme={theme}>
-        <Container py="3" px={[3, null, 0]}>
-          <Flex sx={{ alignItems: 'baseline' }}>
+        <Container px={[3, null, 0]}>
+          <Flex my="2" sx={{ alignItems: 'baseline' }}>
             <Box sx={{ flex: '1 1 auto' }}>
               <Link variant="big" to={Pages.home()}>
                 {title}

@@ -3,8 +3,8 @@ import { Heading, Grid, Box } from 'theme-ui';
 export default function About() {
   return (
     <>
-      <Box py={4}>
-        <Heading as="h1">/about</Heading>
+      <Box my={3}>
+        <Heading as="h2">/about</Heading>
       </Box>
       <Grid gap={3} columns={[null, 2]}>
         <Box>

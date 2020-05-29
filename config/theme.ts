@@ -3,7 +3,9 @@ import { Theme } from 'theme-ui';
 const link: NonNullable<Theme['styles']>['a'] = {
   color: 'primary',
   textDecoration: 'none',
-  padding: 1,
+  padding: '2px',
+  marginRight: '-2px',
+  marginLeft: '-2px',
   borderRadius: 3,
   fontWeight: 'bold',
   transition: 'all 200ms',
@@ -17,12 +19,60 @@ const link: NonNullable<Theme['styles']>['a'] = {
   },
 };
 
+const waves = {
+  default: {
+    Wave: {
+      width: ['100%', 'calc(100vw - 60px)'],
+      marginTop: '40px',
+      marginLeft: ['calc(50% - 50vw + 30px)'],
+      marginBottom: '40px',
+      position: 'relative',
+      display: ['block', 'flex'],
+    },
+    ScrollerContainer: {
+      flex: 1,
+    },
+    ScrollerStep: {
+      position: 'relative',
+      padding: [0, '0 10px'],
+      minHeight: '250px',
+      display: 'flex',
+      alignItems: 'center',
+      borderLeft: ['none', '3px solid transparent'],
+    },
+    ScrollerProgress: {
+      position: 'absolute',
+      left: ['-12px', '-3px'],
+      backgroundColor: 'primary',
+    },
+    StickerContainer: {
+      width: ['100vw', '60%'],
+      position: ['sticky', 'static'],
+      top: [0, 'auto'],
+      zIndex: [1, 'auto'],
+      height: ['50vh', 'auto'],
+      marginLeft: '-16px',
+    },
+    Sticker: {
+      position: ['static', 'sticky'],
+      width: '100%',
+      height: ['100%', '60vh'],
+      top: ['auto', '20vh'],
+      border: ['none', 'none'],
+    },
+    // this is used to select the active scroller step
+    // 0.5 selects the step that is at half the screen height
+    // 0.7 the step that is at 70% the screen height
+    focus: [0.7, 0.5],
+  },
+};
+
 const theme: Theme = {
   space: [0, 4, 8, 16, 32, 64, 128, 256, 512],
   fonts: {
     body: 'Helvetica, -apple-system, sans-serif',
     heading: 'Nunito Sans, sans-serif',
-    monospace: 'Menlo, monospace',
+    monospace: 'monospace',
   },
   fontSizes: [12, 14, 16, 20, 24, 32, 48, 64, 96],
   fontWeights: {
@@ -57,65 +107,27 @@ const theme: Theme = {
   sizes: { container: 720 },
   links: {
     big: {
+      ...link,
       fontFamily: 'heading',
       fontSize: 4,
-      ...link,
+      padding: 2,
+      marginRight: -2,
+      marginLeft: -2,
     },
     nav: {
+      ...link,
       fontFamily: 'heading',
       fontSize: 3,
-      ...link,
+    },
+  },
+  buttons: {
+    primary: {
+      cursor: 'pointer',
     },
   },
   styles: {
     // @ts-ignore
-    waves: {
-      default: {
-        Wave: {
-          width: ['100%', 'calc(100vw - 60px)'],
-          marginTop: '40px',
-          marginLeft: ['calc(50% - 50vw + 30px)'],
-          marginBottom: '40px',
-          position: 'relative',
-          display: ['block', 'flex'],
-        },
-        ScrollerContainer: {
-          flex: 1,
-        },
-        ScrollerStep: {
-          position: 'relative',
-          padding: [0, '0 10px'],
-          minHeight: '250px',
-          display: 'flex',
-          alignItems: 'center',
-          borderLeft: ['none', '3px solid transparent'],
-        },
-        ScrollerProgress: {
-          position: 'absolute',
-          left: ['-12px', '-3px'],
-          backgroundColor: 'primary',
-        },
-        StickerContainer: {
-          width: ['100vw', '60%'],
-          position: ['sticky', 'static'],
-          top: [0, 'auto'],
-          zIndex: [1, 'auto'],
-          height: ['50vh', 'auto'],
-          marginLeft: '-16px',
-        },
-        Sticker: {
-          position: ['static', 'sticky'],
-          width: '100%',
-          height: ['100%', '60vh'],
-          top: ['auto', '20vh'],
-          border: ['none', 'none'],
-        },
-        // this is used to select the active scroller step
-        // 0.5 selects the step that is at half the screen height
-        // 0.7 the step that is at 70% the screen height
-        focus: [0.7, 0.5],
-      },
-    },
+    waves,
     root: {
       fontFamily: 'body',
       lineHeight: 'body',
@@ -147,21 +159,21 @@ const theme: Theme = {
       fontFamily: 'heading',
       lineHeight: 'heading',
       fontWeight: 'heading',
-      fontSize: 2,
+      fontSize: 3,
     },
     h5: {
       color: 'text',
       fontFamily: 'heading',
       lineHeight: 'heading',
       fontWeight: 'heading',
-      fontSize: 1,
+      fontSize: 2,
     },
     h6: {
       color: 'text',
       fontFamily: 'heading',
       lineHeight: 'heading',
       fontWeight: 'heading',
-      fontSize: 0,
+      fontSize: 2,
     },
     p: {
       color: 'text',
@@ -169,14 +181,24 @@ const theme: Theme = {
       fontWeight: 'body',
       lineHeight: 'body',
       fontSize: 2,
+      code: {
+        padding: '2px',
+        fontWeight: 'body',
+        borderRadius: 3,
+        color: 'background',
+        backgroundColor: 'text',
+        fontFamily: 'monospace',
+        fontSize: 'inherit',
+      },
     },
     a: link,
     pre: {
       fontFamily: 'monospace',
       overflowX: 'auto',
-      code: {
-        color: 'inherit',
-      },
+      padding: 3,
+      borderRadius: 3,
+      color: 'background',
+      backgroundColor: 'text',
     },
     code: {
       fontFamily: 'monospace',
@@ -197,6 +219,10 @@ const theme: Theme = {
     },
     img: {
       maxWidth: '100%',
+    },
+    hr: {
+      borderColor: 'muted',
+      borderWidth: '0.5px',
     },
   },
 };

@@ -35,6 +35,7 @@ const withMdxOpts = {
 
 function config() {
   return {
+    target: 'serverless',
     pageExtensions: pageExts,
   };
 }

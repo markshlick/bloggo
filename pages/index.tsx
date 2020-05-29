@@ -1,4 +1,4 @@
-import { Heading, Grid, Box } from 'theme-ui';
+import { Heading, Grid, Box, Badge } from 'theme-ui';
 import { GetStaticProps } from 'next';
 import Link from 'components/Link';
 import Pages from 'config/Pages';
@@ -15,13 +15,24 @@ export const getStaticProps: GetStaticProps = async () => {
 export default function Home({ posts }: { posts: BlogPost[] }) {
   return (
     <>
-      <Box py={4}>
+      <Box my={3}>
         <Heading as="h2">/blog</Heading>
       </Box>
-      <Grid gap={3} columns={[null, 2, 4]}>
-        {posts.map(({ title, slug }) => (
+      <Grid gap={3} columns={[null, 2, 3]}>
+        {posts.map(({ title, slug, tags }) => (
           <Box key={slug}>
-            <Link to={Pages.blogPost({ slug })}>{title}</Link>
+            <Box>
+              <Link variant="nav" to={Pages.blogPost({ slug })}>
+                {title}
+              </Link>
+            </Box>
+            {/* {tags?.map((tag) => (
+              <>
+                <Badge mr={1} key={tag}>
+                  {tag}
+                </Badge>
+              </>
+            ))} */}
           </Box>
         ))}
       </Grid>

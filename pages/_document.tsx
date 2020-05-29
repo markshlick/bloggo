@@ -18,7 +18,7 @@ class MyDocument extends Document {
 
           <link rel="alternate" type="application/rss+xml" href={rssFeedPath} />
           <link
-            href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;700&display=swap"
+            href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;900&display=swap"
             rel="stylesheet"
           ></link>
         </Head>

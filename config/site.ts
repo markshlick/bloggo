@@ -1,10 +1,14 @@
 import URL, { UrlObject } from 'url';
 
+export const moji = '🌲';
+
 export const hostname = 'mrk.cool';
 
 export const title = 'mark shlick';
 
-export const rssFeedPath = '/rss.xml';
+export const rssFileName = 'rss.xml';
+
+export const rssFeedPath = `/_next/static/${rssFileName}`;
 
 export const fathomSiteId = 'PXLGGGJK';
 

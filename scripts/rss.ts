@@ -4,14 +4,14 @@ import RSS from 'rss';
 import { getPostsIndex } from 'helpers/blogPosts';
 import { title, url, rssFeedPath } from 'config/site';
 
-const defaultOutputPath = '../.next/static/';
+const defaultOutputPath = './.next/server/static/';
 
 export default async function generate(outputPath = defaultOutputPath) {
   console.log(__dirname);
   console.log(__filename);
   console.log(fs.readdirSync('.'));
   console.log(fs.readdirSync('./.next'));
-  console.log(fs.readdirSync('./.next/static'));
+  console.log(fs.readdirSync('./.next/server'));
   const blogPosts = await getPostsIndex();
 
   const feed = new RSS({

@@ -11,6 +11,7 @@ export default async function generate(outputPath = defaultOutputPath) {
   console.log(__filename);
   console.log(fs.readdirSync('.'));
   console.log(fs.readdirSync('./.next'));
+  console.log(fs.readdirSync('./.next/static'));
   const blogPosts = await getPostsIndex();
 
   const feed = new RSS({

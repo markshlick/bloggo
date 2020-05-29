@@ -7,9 +7,6 @@ import { title, url, rssFeedPath } from 'config/site';
 const defaultOutputPath = './.next/static/';
 
 export default async function generate(outputPath = defaultOutputPath) {
-  console.log(__dirname);
-  console.log(__filename);
-  console.log(fs.readdirSync('./.next'));
   const blogPosts = await getPostsIndex();
 
   const feed = new RSS({
@@ -28,6 +25,10 @@ export default async function generate(outputPath = defaultOutputPath) {
       description: blogPost.description ?? '',
     });
   });
+
+  if (!fs.existsSync(defaultOutputPath)) {
+    await fs.promises.mkdir(defaultOutputPath, { recursive: true });
+  }
 
   const rss = feed.xml({ indent: true });
   fs.writeFileSync(path.join(outputPath, rssFeedPath), rss);

@@ -1,25 +1,6 @@
 const rehypeWavesPlugin = require('rehype-waves');
 const withMdx = require('@next/mdx');
 
-const rssFeedFilePath = 'scripts/rss.ts';
-const rssFeedOutputFilePath = 'rss.xml';
-
-const nextRssWebpackPlugin = () => ({
-  apply: (compiler) => {
-    compiler.hooks.afterEmit.tapPromise('AfterEmitPlugin', () => {
-      let generateRss;
-      try {
-        generateRss = require(`./.next/server/${rssFeedFilePath}`).default;
-      } catch (error) {
-        // vercel uses the serverless dir
-        generateRss = require(`./.next/serverless/${rssFeedFilePath}`).default;
-      }
-
-      return generateRss();
-    });
-  },
-});
-
 function withRss(nextConf) {
   return {
     ...nextConf,
@@ -36,10 +17,6 @@ function withRss(nextConf) {
     webpack: (config, { dev, isServer }) => {
       if (isServer && !dev) {
         const originalEntry = config.entry;
-
-        if (!dev && isServer) {
-          config.plugins.push(nextRssWebpackPlugin());
-        }
 
         config.entry = async () => {
           const entries = { ...(await originalEntry()) };

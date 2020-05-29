@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next",
-    "build": "next build && ls .next",
+    "build": "next build && yarn build:rss",
+    "build:rss": "node ./scripts/buildRss.js",
     "start": "next start",
     "export": "next export"
   },

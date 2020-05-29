@@ -4,9 +4,9 @@ import RSS from 'rss';
 import { getPostsIndex } from 'helpers/blogPosts';
 import { title, url, rssFeedPath } from 'config/site';
 
-const defaultOutputPath = './.next/static/';
+const outputPath = './.next/static/';
 
-export default async function generate(outputPath = defaultOutputPath) {
+export default async function generate() {
   const blogPosts = await getPostsIndex();
 
   const feed = new RSS({
@@ -28,5 +28,4 @@ export default async function generate(outputPath = defaultOutputPath) {
 
   const rss = feed.xml({ indent: true });
   await fs.promises.writeFile(path.join(outputPath, rssFeedPath), rss);
-  return true;
 }

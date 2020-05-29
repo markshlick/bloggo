@@ -4,7 +4,7 @@ import { AppProps } from 'next/app';
 import theme from 'config/theme';
 import Pages from 'config/Pages';
 import Link from 'components/Link';
-import { title } from 'config/site';
+import { title, fathomSiteId } from 'config/site';
 import Head from 'next/head';
 
 export default function App({ Component, pageProps }: AppProps) {
@@ -12,7 +12,7 @@ export default function App({ Component, pageProps }: AppProps) {
     let tracker = window.document.createElement('script');
     let firstScript = window.document.getElementsByTagName('script')[0];
     tracker.defer = true;
-    tracker.setAttribute('site', 'PXLGGGJK');
+    tracker.setAttribute('site', fathomSiteId);
     tracker.setAttribute('spa', 'auto');
     tracker.src = 'https://cdn.usefathom.com/script.js';
     firstScript.parentNode?.insertBefore(tracker, firstScript);

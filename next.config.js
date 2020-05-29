@@ -6,7 +6,7 @@ const rssFeedOutputFilePath = 'rss.xml';
 
 const nextRssWebpackPlugin = () => ({
   apply: (compiler) => {
-    compiler.hooks.afterEmit.tap('AfterEmitPlugin', () => {
+    compiler.hooks.afterEmit.tapPromise('AfterEmitPlugin', () => {
       let generateRss;
       try {
         generateRss = require(`./.next/server/${rssFeedFilePath}`).default;
@@ -15,7 +15,7 @@ const nextRssWebpackPlugin = () => ({
         generateRss = require(`./.next/serverless/${rssFeedFilePath}`).default;
       }
 
-      generateRss();
+      return generateRss();
     });
   },
 });

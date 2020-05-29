@@ -28,4 +28,5 @@ export default async function generate(outputPath = defaultOutputPath) {
 
   const rss = feed.xml({ indent: true });
   await fs.promises.writeFile(path.join(outputPath, rssFeedPath), rss);
+  return true;
 }

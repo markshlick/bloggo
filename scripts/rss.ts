@@ -7,6 +7,8 @@ import { title, url, rssFeedPath } from 'config/site';
 const defaultOutputPath = '../.next/static/';
 
 export default async function generate(outputPath = defaultOutputPath) {
+  console.log(__dirname);
+  console.log(__filename);
   const blogPosts = await getPostsIndex();
 
   const feed = new RSS({

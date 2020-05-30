@@ -6,7 +6,6 @@
     "dev": "next",
     "build": "next build && yarn build:rss",
     "build:rss": "node ./scripts/buildRss.js",
-    "start": "next start",
     "export": "next export"
   },
   "dependencies": {
@@ -16,6 +15,7 @@
     "@stripe/react-stripe-js": "^1.1.2",
     "@stripe/stripe-js": "^1.5.0",
     "@types/rss": "^0.0.28",
+    "dotenv": "^8.2.0",
     "next": "9.4.0",
     "react": "16.13.1",
     "react-dom": "16.13.1",
@@ -23,6 +23,7 @@
     "rehype-waves": "^0.1.6",
     "rss": "^1.2.2",
     "shell-quote": "^1.7.2",
+    "stripe": "^8.56.0",
     "theme-ui": "^0.3.1",
     "use-spring": "^0.2.3"
   },

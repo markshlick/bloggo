@@ -1,4 +1,5 @@
 // @ts-check
+require('dotenv').config();
 
 const rehypeWavesPlugin = require('rehype-waves');
 const withMdx = require('@next/mdx');
@@ -37,6 +38,9 @@ function config() {
   return {
     target: 'serverless',
     pageExtensions: pageExts,
+    env: {
+      STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY,
+    },
   };
 }
 

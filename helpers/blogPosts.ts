@@ -17,7 +17,7 @@ export interface BlogPost extends BlogPostBase {
 }
 
 const sortBlogPostsByDate = (post1: BlogPost, post2: BlogPost): 1 | -1 =>
-  post1.date > post2.date ? -1 : 1;
+  new Date(post1.date) > new Date(post2.date) ? -1 : 1;
 
 export async function getPostsIndex(): Promise<BlogPost[]> {
   const postFileNames = await fs.readdir('./pages/blog');

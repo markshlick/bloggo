@@ -182,7 +182,6 @@ const theme: Theme = {
       lineHeight: 'body',
       fontSize: 2,
       code: {
-        lineBreak: 'anywhere',
         padding: '2px',
         fontWeight: 'body',
         borderRadius: 3,

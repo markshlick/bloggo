@@ -25,7 +25,7 @@ export default function App({ Component, pageProps }: AppProps) {
       </Head>
       <ThemeProvider theme={theme}>
         <Container px={[3, null, 0]}>
-          <Flex my="2" sx={{ alignItems: 'baseline' }}>
+          <Flex my="2" sx={{ alignItems: 'center' }}>
             <Box sx={{ flex: '1 1 auto' }}>
               <Link variant="big" to={Pages.home()}>
                 {moji} {title}

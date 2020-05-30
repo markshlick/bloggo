@@ -16,7 +16,7 @@ export default function Home({ posts }: { posts: BlogPost[] }) {
   return (
     <>
       <Box my={3}>
-        <Heading as="h2">/blog</Heading>
+        <Heading as="h2">/blog/</Heading>
       </Box>
       <Grid gap={3} columns={[null, 2, 3]}>
         {posts.map(({ title, slug, tags }) => (
@@ -28,7 +28,7 @@ export default function Home({ posts }: { posts: BlogPost[] }) {
             </Box>
             {/* {tags?.map((tag) => (
               <>
-                <Badge mr={1} key={tag}>
+                <Badge variant="primary" mr={1} key={tag}>
                   {tag}
                 </Badge>
               </>

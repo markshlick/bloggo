@@ -2,9 +2,13 @@ import URL, { UrlObject } from 'url';
 
 export const moji = '🌲';
 
-export const hostname = 'mrk.cool';
-
 export const title = 'mark shlick';
+
+export const what = 'quarantine-ing';
+
+export const where = 'Hillsboro, Oregon';
+
+export const hostname = 'mrk.cool';
 
 export const rssFileName = 'rss.xml';
 

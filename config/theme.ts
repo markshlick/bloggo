@@ -125,6 +125,14 @@ const theme: Theme = {
       cursor: 'pointer',
     },
   },
+  badges: {
+    primary: {
+      fontSize: 0,
+      color: 'text',
+      bg: 'transparent',
+      boxShadow: 'inset 0 0 0 1px',
+    },
+  },
   styles: {
     // @ts-ignore
     waves,

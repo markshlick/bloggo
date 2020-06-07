@@ -40,6 +40,8 @@ function config() {
     pageExtensions: pageExts,
     env: {
       STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY,
+      AUTH0_DOMAIN: process.env.AUTH0_DOMAIN,
+      AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
     },
   };
 }

@@ -9,6 +9,7 @@
     "export": "next export"
   },
   "dependencies": {
+    "@auth0/auth0-spa-js": "^1.9.0",
     "@code-surfer/standalone": "^3.1.1",
     "@mdx-js/loader": "^1.6.4",
     "@next/mdx": "^9.4.2",

@@ -67,7 +67,7 @@ function Header() {
           <Link variant="nav" mr="2" to={Pages.about()}>
             about
           </Link>
-          {isAuthenticated ? (
+          {/* {isAuthenticated ? (
             <ThemeUILink onClick={() => logout()} variant="nav">
               log out
             </ThemeUILink>
@@ -80,7 +80,7 @@ function Header() {
                 log in
               </ThemeUILink>
             </>
-          )}
+          )} */}
         </Box>
       </Flex>
     </Container>

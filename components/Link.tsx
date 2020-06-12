@@ -1,5 +1,5 @@
 import NextLink from 'next/link';
-import { Link as ThemeUILink } from 'theme-ui';
+import { Link as ThemeUILink, LinkProps } from 'theme-ui';
 import { PropsWithChildren } from 'react';
 
 export default function Link({
@@ -7,20 +7,22 @@ export default function Link({
   variant,
   children,
   ...props
-}: PropsWithChildren<{
-  variant?: string;
-  to: {
-    href: string;
-    as: string;
-  };
-}>) {
-  const themeLinkProps: { variant?: string } = {};
+}: PropsWithChildren<
+  LinkProps & {
+    variant?: string;
+    to: {
+      href: string;
+      as: string;
+    };
+  }
+>) {
+  const themeLinkProps: LinkProps & { variant?: string } = { ...props };
   if (variant) {
     themeLinkProps.variant = variant;
   }
 
   return (
-    <NextLink passHref href={href} as={as} {...props}>
+    <NextLink passHref href={href} as={as}>
       <ThemeUILink {...themeLinkProps}>{children}</ThemeUILink>
     </NextLink>
   );

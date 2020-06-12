@@ -1,81 +1,80 @@
-import { FormEvent } from 'react';
+import { FormEvent, useState } from 'react';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
-import { Button, Box, Flex } from 'theme-ui';
+import { Button, Box, Flex, Input, Heading, useThemeUI } from 'theme-ui';
+import { stripeSubscriptionPriceId } from 'config/site';
 
-const stripePromise = loadStripe(process.env.STRIPE_PUBLISHABLE_KEY!);
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
-const priceId = 'price_HN5nSr1Tz57uBO';
+function handleSubscriptionResponse(stripe, { paymentMethodId, priceId, subscription }) {
+  const { payment_intent: paymentIntent } = subscription.latest_invoice;
 
-async function signup(): Promise<{ customer: { id: string } }> {
-  return await (
-    await fetch('/api/customer', {
-      method: 'post',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: 'markshlick@gmail.com',
-      }),
-    })
-  ).json();
+  if (paymentIntent.status === 'requires_action') {
+    return stripe
+      .confirmCardPayment(paymentIntent.client_secret, {
+        payment_method: paymentMethodId,
+      })
+      .then((result) => {
+        if (result.error) {
+          // start code flow to handle updating the payment details
+          // Display error message in your UI.
+          // The card was declined (i.e. insufficient funds, card has expired, etc)
+          throw result;
+        } else {
+          if (result.paymentIntent.status === 'succeeded') {
+            // There's a risk of the customer closing the window before callback
+            // execution. To handle this case, set up a webhook endpoint and
+            // listen to invoice.payment_succeeded. This webhook endpoint
+            // returns an Invoice.
+            return {
+              paymentIntent,
+              priceId,
+              subscription,
+              paymentMethodId,
+            };
+          }
+        }
+      });
+  } else {
+    // No customer action needed
+    return { subscription, priceId, paymentMethodId };
+  }
 }
 
-function subscribe({
-  customerId,
-  paymentMethodId,
-  priceId,
-}: {
-  customerId: string;
-  paymentMethodId: string;
-  priceId: string;
-}) {
-  return (
-    fetch('/api/subscribe', {
+async function subscribe(
+  stripe,
+  {
+    paymentMethodId,
+    priceId,
+  }: {
+    paymentMethodId: string;
+    priceId: string;
+  }
+) {
+  const result = await (
+    await fetch('/api/subscribe', {
       method: 'post',
       headers: {
         'Content-type': 'application/json',
       },
       body: JSON.stringify({
-        customerId,
+        email: 'markshlick@gmail.com',
         paymentMethodId,
         priceId,
       }),
     })
-      .then((response) => {
-        return response.json();
-      })
-      // If the card is declined, display an error to the user.
-      .then((result) => {
-        if (result.error) {
-          // The card had an error when trying to attach it to a customer
-          throw result;
-        }
-        return result;
-      })
-      // Normalize the result to contain the object returned
-      // by Stripe. Add the addional details we need.
-      .then((result) => {
-        return {
-          // Use the Stripe 'object' property on the
-          // returned result to understand what object is returned.
-          subscription: result,
-          paymentMethodId: paymentMethodId,
-          priceId: priceId,
-        };
-      })
-    // Some payment methods require a customer to do additional
-    // authentication with their financial institution.
-    // Eg: 2FA for cards.
-    // .then(handleCustomerActionRequired)
-    // If attaching this card to a Customer object succeeds,
-    // but attempts to charge the customer fail. You will
-    // get a requires_payment_method error.
-    // .then(handlePaymentMethodRequired)
-  );
+  ).json();
+
+  if (result.error) {
+    throw result;
+  }
+
+  return handleSubscriptionResponse(stripe, { paymentMethodId, priceId, subscription: result });
 }
 
 const CheckoutForm = () => {
+  const [isFormDisabled, setIsFormDisabled] = useState(false);
+  const { theme } = useThemeUI();
   const stripe = useStripe();
   const elements = useElements();
 
@@ -103,19 +102,52 @@ const CheckoutForm = () => {
       return;
     }
 
-    const { customer } = await signup();
-
-    await subscribe({ customerId: customer.id, paymentMethodId: paymentMethod!.id, priceId });
+    setIsFormDisabled(true);
+    try {
+      const result = await subscribe(stripe, {
+        paymentMethodId: paymentMethod!.id,
+        priceId: stripeSubscriptionPriceId,
+      });
+    } catch (error) {
+    } finally {
+      setIsFormDisabled(false);
+    }
   };
 
   return (
     <form onSubmit={handleSubmit}>
       <Box my="3">
-        <CardElement />
+        <Heading>Subscribe for $1.50/mo</Heading>
+      </Box>
+      <Box my="3">
+        <Input type="email" name="email" id="email" placeholder="you@email.co" />
+      </Box>
+      <Box
+        my="3"
+        py="2"
+        px="2"
+        sx={{
+          borderColor: 'text',
+          borderWidth: '1px',
+          borderStyle: 'solid',
+          borderRadius: '5px',
+        }}
+      >
+        <CardElement
+          options={{
+            style: {
+              base: {
+                fontSize: theme!.fontSizes![2] + 'px',
+                lineHeight: '28px',
+                fontFamily: (theme!.fonts as Record<string, string>).body,
+              },
+            },
+          }}
+        />
       </Box>
       <Flex sx={{ justifyContent: 'flex-end' }}>
         <Box>
-          <Button type="submit" disabled={!stripe}>
+          <Button type="submit" disabled={!stripe || isFormDisabled}>
             Subscribe
           </Button>
         </Box>

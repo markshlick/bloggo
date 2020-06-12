@@ -70,7 +70,7 @@ const waves = {
 const theme: Theme = {
   space: [0, 4, 8, 16, 32, 64, 128, 256, 512],
   fonts: {
-    body: 'Helvetica, -apple-system, sans-serif',
+    body: 'system-ui, -apple-system, sans-serif',
     heading: 'Nunito Sans, sans-serif',
     monospace: 'monospace',
   },

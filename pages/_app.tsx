@@ -11,8 +11,8 @@ import Head from 'next/head';
 import { Auth0Provider, useAuth0 } from 'components/AuthProvider';
 
 const auth0InitOptions = {
-  client_id: process.env.AUTH0_CLIENT_ID!,
-  domain: process.env.AUTH0_DOMAIN!,
+  client_id: process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID!,
+  domain: process.env.NEXT_PUBLIC_AUTH0_DOMAIN!,
   redirect_uri: 'http://localhost:3000/',
 };
 
@@ -54,7 +54,6 @@ export default function App({ Component, pageProps }: AppProps) {
 
 function Header() {
   const { login, logout, isAuthenticated, user } = useAuth0();
-  console.log(user);
 
   return (
     <Container px={[3, null, 0]}>
@@ -65,17 +64,22 @@ function Header() {
           </Link>
         </Box>
         <Box>
-          <Link variant="nav" to={Pages.about()}>
-            about me
-          </Link>{' '}
+          <Link variant="nav" mr="2" to={Pages.about()}>
+            about
+          </Link>
           {isAuthenticated ? (
             <ThemeUILink onClick={() => logout()} variant="nav">
               log out
             </ThemeUILink>
           ) : (
-            <ThemeUILink onClick={() => login()} variant="nav">
-              log in
-            </ThemeUILink>
+            <>
+              <Link variant="nav" mr="2" to={Pages.subscribe()}>
+                subscribe
+              </Link>
+              <ThemeUILink onClick={() => login()} variant="nav">
+                log in
+              </ThemeUILink>
+            </>
           )}
         </Box>
       </Flex>

@@ -11,4 +11,8 @@ export default {
     href: '/about',
     as: '/about',
   }),
+  subscribe: () => ({
+    href: '/subscribe',
+    as: '/subscribe',
+  }),
 };

@@ -124,7 +124,7 @@ const messageHandlers = {
 
     send('offer', id, { offer });
   },
-  offer: async ({ id, send, initPeer, value: { offer } }) => {
+  offer: async ({ id, send, initPeer, message: { offer } }) => {
     const peerState = await initPeer({
       id,
       reciever: true,
@@ -136,7 +136,7 @@ const messageHandlers = {
 
     send('answer', id, { answer });
   },
-  answer: async ({ id, value: { answer }, send, peers }) => {
+  answer: async ({ id, message: { answer }, send, peers }) => {
     const peerConnection = peers[id].peerConnection;
     await peerConnection.setRemoteDescription(answer);
 
@@ -146,7 +146,7 @@ const messageHandlers = {
       peers[id].iceCandidates = [];
     }
   },
-  ice: async ({ id, value: { candidates }, peers, send }) => {
+  ice: async ({ id, message: { candidates }, peers, send }) => {
     candidates.forEach((c) => peers[id].peerConnection.addIceCandidate(new RTCIceCandidate(c)));
 
     peers[id].readyForIce = true;
@@ -171,7 +171,7 @@ const webrtc = async ({
 
   onLocalVideo(localMediaStream);
 
-  const send = (type, id, value) => sendSignalMessage({ type, id, value });
+  const send = (type, id, message) => sendSignalMessage({ type, id, message });
 
   const initPeer = async ({ id }) => {
     const peer = await initPeerConnection({
@@ -191,7 +191,7 @@ const webrtc = async ({
     return peer;
   };
 
-  const handleSignalMessage = ({ type, id, value }) => {
+  const handleSignalMessage = ({ type, id, message }) => {
     const handler = messageHandlers[type];
     if (handler) {
       handler({
@@ -199,7 +199,7 @@ const webrtc = async ({
         send,
         initPeer,
         peers,
-        value,
+        message,
       });
     }
   };

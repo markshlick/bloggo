@@ -18,7 +18,7 @@ export const rssFileName = 'rss.xml';
 
 export const rssFeedPath = `/_next/static/${rssFileName}`;
 
-export const signalingServer = 'https://justcallme.herokuapp.com/';
+export const signalingServer = 'https://chill.onrender.com/';
 
 export const signalingServerDev = 'localhost:3001';
 

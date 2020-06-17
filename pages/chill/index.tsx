@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import io from 'socket.io-client';
+import useSWR from 'swr';
+
 import webrtc from 'helpers/webrtc';
-import styles from './chill.module.css';
 import { signalingServer, signalingServerDev } from 'config/site';
+import styles from 'pages/chill/chill.module.css';
 
-// @ts-check
+async function fetchJson<JSON = any>(input: RequestInfo, init?: RequestInit): Promise<JSON> {
+  const res = await fetch(input, init);
+  return res.json();
+}
 
-// const debugMode = window.location.search.includes('debug');
 const debug = (name: string, value?: any) => {
   console.log(name, value);
 };
@@ -161,6 +165,26 @@ const emote = async ({ emoji, containerEl }: { emoji: string; containerEl: HTMLD
   }
 };
 
+const emoteGif = async ({ gif, containerEl }: { gif: string; containerEl: HTMLDivElement }) => {
+  await new Promise((resolve, reject) => {
+    const img = new Image();
+    img.src = gif;
+    img.onload = resolve;
+    img.onerror = reject;
+  });
+
+  const el = appendHtml(
+    containerEl,
+    `
+    <div class="${styles.gifA}">
+      <img src="${gif}">
+    </div>
+  `
+  );
+
+  sleep(2500).then(() => el?.remove());
+};
+
 function Emotes({ emoji, onClick }: { emoji: string[]; onClick: (s: string) => void }) {
   return (
     <div className={styles.emotesBar}>
@@ -169,11 +193,52 @@ function Emotes({ emoji, onClick }: { emoji: string[]; onClick: (s: string) => v
           {emoj}
         </button>
       ))}
+      <button onClick={() => onClick('gif')} className={styles.emoteButton} key={'gif'}>
+        GIF
+      </button>
+    </div>
+  );
+}
+
+function GiphyStickers({ onSelect }) {
+  const [q, setQuery] = useState('');
+  const res = useSWR<{ data: { images: { preview_gif: { url: string } } }[] }>(
+    `https://api.giphy.com/v1/stickers/search?api_key=EilKHJDlSoAHjFVugtLEDK6gqy2aR4V8&q=${q}&limit=25&offset=0&rating=G&lang=en1`,
+    fetchJson
+  );
+
+  return (
+    <div className={styles.gifTray}>
+      <div>
+        <input
+          autoFocus
+          placeholder="Search for gifs"
+          type="text"
+          className={styles.gifInput}
+          value={q}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
+      <div className={styles.gifOptions}>
+        {res.data?.data.map((d) => (
+          <img
+            key={d.id}
+            className={styles.gif}
+            src={d.images.preview_gif.url}
+            alt=""
+            onClick={() => {
+              setQuery('');
+              onSelect(d.images.original.url);
+            }}
+          />
+        ))}
+      </div>
     </div>
   );
 }
 
 export default function Chill() {
+  const [isGifDrawerOpen, setIsGifDrawerOpen] = useState(false);
   const webrtcRef = useRef<any>(null);
   const localVideoContainerRef = useRef<HTMLDivElement>(null);
   const remoteVideoContainerRef = useRef<HTMLDivElement>(null);
@@ -196,6 +261,11 @@ export default function Chill() {
             emoji: message.value,
             containerEl: emoteContainerRef.current!,
           });
+        } else if (message.type === 'gif') {
+          emoteGif({
+            gif: message.value,
+            containerEl: emoteContainerRef.current!,
+          });
         }
       },
     });
@@ -215,18 +285,34 @@ export default function Chill() {
     <div className={styles.chill}>
       <div ref={localVideoContainerRef}></div>
       <div className={styles.friends} ref={remoteVideoContainerRef}></div>
-      <div className={styles.emotes} ref={emoteContainerRef}></div>
       <Emotes
         emoji={['😍', '😂', '🔥', '🎉', '💩']}
         onClick={(e) => {
-          emoteContainerRef.current &&
-            emote({
-              emoji: e,
-              containerEl: emoteContainerRef.current,
-            });
-          send('emote', e);
+          if (e === 'gif') {
+            setIsGifDrawerOpen(true);
+          } else {
+            emoteContainerRef.current &&
+              emote({
+                emoji: e,
+                containerEl: emoteContainerRef.current,
+              });
+            send('emote', e);
+          }
         }}
       />
+      {isGifDrawerOpen && (
+        <GiphyStickers
+          onSelect={(url) => {
+            send('gif', url);
+            setIsGifDrawerOpen(false);
+            emoteGif({
+              gif: url,
+              containerEl: emoteContainerRef.current!,
+            });
+          }}
+        />
+      )}
+      <div className={styles.emotes} ref={emoteContainerRef}></div>
     </div>
   );
 }

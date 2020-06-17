@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import io from 'socket.io-client';
 import webrtc from 'helpers/webrtc';
-import styles from 'config/chill.module.css';
+import styles from './chill.module.css';
 import { signalingServer, signalingServerDev } from 'config/site';
 
 // @ts-check

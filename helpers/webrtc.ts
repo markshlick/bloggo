@@ -1,5 +1,9 @@
 // @ts-nocheck
 
+if (typeof window !== 'undefined') {
+  require('webrtc-adapter');
+}
+
 const mediaConfig = {
   audio: {
     noiseSuppression: true,

@@ -1,4 +1,4 @@
-import '../config/app.css';
+import './app.css';
 import { useEffect } from 'react';
 import { ThemeProvider, Container, Flex, Box } from 'theme-ui';
 import { AppProps } from 'next/app';

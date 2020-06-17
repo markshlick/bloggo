@@ -27,7 +27,8 @@
     "socket.io-client": "^2.3.0",
     "stripe": "^8.56.0",
     "theme-ui": "^0.3.1",
-    "use-spring": "^0.2.3"
+    "use-spring": "^0.2.3",
+    "webrtc-adapter": "^7.6.2"
   },
   "devDependencies": {
     "@types/node": "^14.0.1",

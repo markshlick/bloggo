@@ -38,7 +38,7 @@ const signalingServerUrl =
 
 const run = async ({ remoteVideoContainerEl, localVideoContainerEl, onMessage }: any) => {
   let videoEls: Record<string, HTMLVideoElement> = {};
-  let localVideoEL;
+  let localVideoEL: HTMLVideoElement | null = null;
 
   const { handleSignalMessage, start, sendMessage, stop } = await webrtc({
     iceServers: [

@@ -219,6 +219,12 @@ function GiphyStickers({ onSelect }: { onSelect: (s: string) => void }) {
           className={styles.gifInput}
           value={q}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyPress={(event) => {
+            if (res.data && event.key === 'Enter') {
+              setQuery('');
+              onSelect(res.data.data[0].images.original.url);
+            }
+          }}
         />
       </div>
       <div className={styles.gifOptions}>

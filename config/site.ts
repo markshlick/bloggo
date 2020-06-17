@@ -12,7 +12,7 @@ export const where = 'Hillsboro, Oregon';
 
 // files
 
-export const hostname = 'mrk.cool';
+export const hostname = 'mksh.io';
 
 export const rssFileName = 'rss.xml';
 

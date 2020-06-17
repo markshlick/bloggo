@@ -1,3 +1,4 @@
+import '../config/app.css';
 import { useEffect } from 'react';
 import { ThemeProvider, Container, Flex, Box } from 'theme-ui';
 import { AppProps } from 'next/app';
@@ -34,8 +35,14 @@ const useAnalytics = () => {
   }, []);
 };
 
-export default function App({ Component, pageProps }: AppProps) {
+export default function App(props: AppProps) {
+  const { Component, pageProps } = props;
   useAnalytics();
+
+  // @ts-ignore
+  if (Component.layout === 'none') {
+    return <Component {...pageProps} />;
+  }
 
   return (
     <>
@@ -53,7 +60,7 @@ export default function App({ Component, pageProps }: AppProps) {
 }
 
 function Header() {
-  const { login, logout, isAuthenticated, user } = useAuth0();
+  // const { login, logout, isAuthenticated, user } = useAuth0();
 
   return (
     <Container px={[3, null, 0]}>

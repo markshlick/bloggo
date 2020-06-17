@@ -23,6 +23,7 @@
     "rehype-waves": "^0.1.6",
     "rss": "^1.2.2",
     "shell-quote": "^1.7.2",
+    "socket.io-client": "^2.3.0",
     "stripe": "^8.56.0",
     "theme-ui": "^0.3.1",
     "use-spring": "^0.2.3"
@@ -30,6 +31,7 @@
   "devDependencies": {
     "@types/node": "^14.0.1",
     "@types/react": "^16.9.35",
+    "@types/socket.io-client": "^1.4.33",
     "@types/theme-ui": "^0.3.2",
     "babel-plugin-preval": "^5.0.0",
     "typescript": "^3.9.2"

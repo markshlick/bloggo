@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import io from 'socket.io-client';
 import webrtc from 'helpers/webrtc';
 import styles from 'config/chill.module.css';
+import { signalingServer, signalingServerDev } from 'config/site';
 
 // @ts-check
 
@@ -34,12 +35,9 @@ const initVideoEl = ({ mute, stream, el }: any) => {
 
 const run = async ({ remoteVideoContainerEl, localVideoContainerEl }: any) => {
   const videoEls: Record<string, HTMLVideoElement> = {};
-  const socket = io(
-    process.env.NODE_ENV === 'production' ? 'https://justcallme.herokuapp.com/' : 'localhost:3001',
-    {
-      autoConnect: false,
-    }
-  );
+  const socket = io(process.env.NODE_ENV === 'production' ? signalingServer : signalingServerDev, {
+    autoConnect: false,
+  });
 
   const { handleSignalMessage, start, sendMessage, stop } = await webrtc({
     iceServers: [

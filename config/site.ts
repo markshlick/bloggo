@@ -18,6 +18,10 @@ export const rssFileName = 'rss.xml';
 
 export const rssFeedPath = `/_next/static/${rssFileName}`;
 
+export const signalingServer = 'https://justcallme.herokuapp.com/';
+
+export const signalingServerDev = 'localhost:3001';
+
 // keys
 
 export const fathomSiteId = 'PXLGGGJK';

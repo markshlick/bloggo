@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next",
+    "dev:signaling": "next & PORT=3001 node ext/signal-serv",
     "build": "next build && yarn build:rss",
     "build:rss": "node ./scripts/buildRss.js",
     "export": "next export"

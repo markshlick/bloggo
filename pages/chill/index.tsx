@@ -200,9 +200,11 @@ function Emotes({ emoji, onClick }: { emoji: string[]; onClick: (s: string) => v
   );
 }
 
-function GiphyStickers({ onSelect }) {
+function GiphyStickers({ onSelect }: { onSelect: (s: string) => void }) {
   const [q, setQuery] = useState('');
-  const res = useSWR<{ data: { images: { preview_gif: { url: string } } }[] }>(
+  const res = useSWR<{
+    data: { id: string; images: { preview_gif: { url: string }; original: { url: string } } }[];
+  }>(
     `https://api.giphy.com/v1/stickers/search?api_key=EilKHJDlSoAHjFVugtLEDK6gqy2aR4V8&q=${q}&limit=25&offset=0&rating=G&lang=en1`,
     fetchJson
   );

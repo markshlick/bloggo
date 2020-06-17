@@ -54,3 +54,51 @@
   border-radius: 50%;
   box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.5);
 }
+
+.emotesBar {
+  user-select: none;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.emoteButton {
+  outline: none;
+  cursor: pointer;
+  font-size: 36pt;
+  background: none;
+  border: none;
+  margin: 0px 5px;
+}
+
+@keyframes float {
+  from {
+    transform: translateY(0) rotate(0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-90vh) rotate(180deg) scale(0.6);
+    opacity: 0;
+  }
+}
+
+.emotes {
+  pointer-events: none;
+  user-select: none;
+}
+
+.emoteA {
+  pointer-events: none;
+  position: absolute;
+  bottom: -100px;
+  left: 50%;
+}
+
+.emoteB {
+  animation: float 1500ms forwards ease-out;
+  pointer-events: none;
+  font-size: 50pt;
+}

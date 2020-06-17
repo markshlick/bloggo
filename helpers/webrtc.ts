@@ -65,6 +65,8 @@ const initPeerConnection = async ({
       const s = JSON.stringify({ type: 'close' });
       dataChannel.send(s);
     }
+    dataChannel.close();
+    peerConnection.close();
   };
 
   const state = {

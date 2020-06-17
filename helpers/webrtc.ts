@@ -4,7 +4,7 @@ if (typeof window !== 'undefined') {
   require('webrtc-adapter');
 }
 
-const mediaConfig = {
+const mediaConfig: MediaStreamConstraints = {
   audio: {
     noiseSuppression: true,
   },

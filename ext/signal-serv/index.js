@@ -4,7 +4,7 @@ const http = require('http');
 const IO = require('socket.io');
 
 const server = http.createServer(async (req, res) => {
-  res.writeHead(404).end();
+  res.writeHead(200).end();
 });
 
 const io = IO(server);

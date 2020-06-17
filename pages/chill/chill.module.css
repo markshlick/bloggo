@@ -132,7 +132,7 @@
   width: 360px;
   left: 0;
   right: 0;
-  bottom: 20px;
+  top: 10px;
   margin: auto;
   background-color: rgba(0, 0, 0, 0.8);
   border-radius: 3px;
@@ -148,7 +148,7 @@
 }
 
 .gifOptions {
-  height: 300px;
+  height: 280px;
   overflow: scroll;
   padding: 10px;
   box-sizing: border-box;

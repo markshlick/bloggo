@@ -1,12 +1,20 @@
 import { FormEvent, useState } from 'react';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { loadStripe } from '@stripe/stripe-js';
+import { loadStripe, Stripe } from '@stripe/stripe-js';
 import { Button, Box, Flex, Input, Heading, useThemeUI } from 'theme-ui';
 import { stripeSubscriptionPriceId } from 'config/site';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
-function handleSubscriptionResponse(stripe, { paymentMethodId, priceId, subscription }) {
+function handleSubscriptionResponse(
+  stripe: Stripe,
+  {
+    paymentMethodId,
+    priceId,
+    subscription,
+  }: { paymentMethodId: string; priceId: string; subscription: unknown }
+) {
+  // @ts-ignore
   const { payment_intent: paymentIntent } = subscription.latest_invoice;
 
   if (paymentIntent.status === 'requires_action') {
@@ -21,7 +29,7 @@ function handleSubscriptionResponse(stripe, { paymentMethodId, priceId, subscrip
           // The card was declined (i.e. insufficient funds, card has expired, etc)
           throw result;
         } else {
-          if (result.paymentIntent.status === 'succeeded') {
+          if (result.paymentIntent?.status === 'succeeded') {
             // There's a risk of the customer closing the window before callback
             // execution. To handle this case, set up a webhook endpoint and
             // listen to invoice.payment_succeeded. This webhook endpoint
@@ -42,7 +50,7 @@ function handleSubscriptionResponse(stripe, { paymentMethodId, priceId, subscrip
 }
 
 async function subscribe(
-  stripe,
+  stripe: Stripe,
   {
     paymentMethodId,
     priceId,

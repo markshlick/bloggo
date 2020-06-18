@@ -142,7 +142,7 @@ const MediaInput = ({ onSubmit }: { onSubmit: (p: { url: string }) => void }) =>
 };
 
 export default function Chill() {
-  const [mediaUrl, setMediaUrl] = useState<string>();
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [isGifDrawerOpen, setIsGifDrawerOpen] = useState(false);
   const [isMediaInputOpen, setIsMediaInputOpen] = useState(false);
 
@@ -208,20 +208,26 @@ export default function Chill() {
       <div className={styles.friends} ref={remoteVideoContainerRef}></div>
       {mediaUrl && (
         <div className={styles.player}>
-          <ReactPlayer
-            ref={playerRef}
-            width="70vw"
-            height="calc(70vw * 0.5625)"
-            style={{
-              margin: '0 auto',
-            }}
-            config={{
-              youtube: {
-                playerVars: { autoplay: '1' },
-              },
-            }}
-            url={mediaUrl}
-          />
+          <div className={styles.playerContent}>
+            <ReactPlayer
+              ref={playerRef}
+              width="85vw"
+              height="calc(85vw * 0.5625)"
+              style={{
+                margin: '0 auto',
+              }}
+              config={{}}
+              url={mediaUrl}
+            />
+
+            <button
+              aria-label="Close Media"
+              className={styles.playerClose}
+              onClick={() => setMediaUrl(null)}
+            >
+              ×
+            </button>
+          </div>
         </div>
       )}
       <Emotes

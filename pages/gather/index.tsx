@@ -44,4 +44,5 @@ export default function GatherLanding() {
   );
 }
 
+// @ts-ignore
 ChillLanding.layout = 'none';

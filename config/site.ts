@@ -27,6 +27,8 @@ export const signalingServerUrl =
 
 // keys
 
+export const giphyApiKey = 'EilKHJDlSoAHjFVugtLEDK6gqy2aR4V8';
+
 export const fathomSiteId = 'PXLGGGJK';
 
 export const stripeSubscriptionPriceId = 'price_1GrXmtIZl1DrUnWJCIGqnUzW';

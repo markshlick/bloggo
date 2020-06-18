@@ -23,9 +23,15 @@
 
 @keyframes gif {
   from {
-    transform: rotate(-90deg) scale(0.4);
+    transform: rotate(-225deg) scale(0.2);
     opacity: 0;
   }
+
+  75% {
+    transform: rotate(0deg) scale(1.6);
+    opacity: 0.9;
+  }
+
   to {
     transform: rotate(0deg) scale(1);
     opacity: 1;
@@ -73,7 +79,7 @@
   width: min(85vw, 85vh);
   border-radius: 50%;
   margin: 10px;
-  box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.5);
+  box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .self {
@@ -87,7 +93,7 @@
   height: min(25vw, 25vh);
   width: min(25vw, 25vh);
   border-radius: 50%;
-  box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.5);
+  box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .emotesBar {
@@ -101,7 +107,6 @@
 }
 
 .emoteButton {
-  outline: none;
   cursor: pointer;
   font-size: 26pt;
   background: none;
@@ -129,43 +134,55 @@
 
 .gifTray {
   position: absolute;
-  width: 360px;
-  left: 0;
-  right: 0;
-  top: 10px;
-  margin: auto;
-  background-color: rgba(0, 0, 0, 0.8);
-  border-radius: 3px;
-  padding: 10px;
+  width: 90vw;
+  max-width: 540px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.gifTrayContent {
+  animation: popout 350ms ease-out;
+  background-color: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(15px);
+  border-radius: 4px;
+  padding: 20px;
   box-sizing: border-box;
+  box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.8);
 }
 
 .gifInput {
   width: 100%;
   box-sizing: border-box;
-  padding: 5px;
   font-size: 18pt;
 }
 
 .gifOptions {
-  height: 280px;
+  min-height: 320px;
+  max-height: 60vh;
   overflow: scroll;
-  padding: 10px;
+  box-sizing: border-box;
+  margin: 0 -5px;
+}
+
+.gifPreview {
+  width: 33%;
+  padding: 5px;
   box-sizing: border-box;
 }
 
-.gif {
-  width: 80px;
-  height: 80px;
-  object-fit: contain;
+.gifA {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
-.gifA {
+.gifB {
   animation: gif 600ms linear;
-  position: absolute;
-  top: 200px;
-  left: 0;
-  right: 0;
-  width: 100%;
-  text-align: center;
+}
+
+.gif {
+  max-width: 90vw;
+  border-radius: 8px;
 }

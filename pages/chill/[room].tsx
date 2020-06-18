@@ -1,11 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/router';
 import io from 'socket.io-client';
 import useSWR from 'swr';
-import { useRouter } from 'next/router';
+import Modal from 'react-modal';
+import { useDebounce } from 'use-debounce';
+
 import webrtc from 'helpers/webrtc';
-import { signalingServerUrl } from 'config/site';
-import styles from 'pages/chill/chill.module.css';
+import { signalingServerUrl, giphyApiKey } from 'config/site';
 import { fetchJson } from 'helpers/fetchJson';
+
+import styles from 'pages/chill/chill.module.css';
+
+const appEl = typeof window === 'undefined' ? null : document.getElementById('__next');
 
 const debug = (name: string, value?: any) => {
   console.log(name, value);
@@ -171,7 +177,9 @@ const emoteGif = async ({ gif, containerEl }: { gif: string; containerEl: HTMLDi
     containerEl,
     `
     <div class="${styles.gifA}">
-      <img src="${gif}">
+      <div class="${styles.gifB}">
+        <img class="${styles.gif}" src="${gif}">
+      </div>
     </div>
   `
   );
@@ -194,19 +202,24 @@ function Emotes({ emoji, onClick }: { emoji: string[]; onClick: (s: string) => v
   );
 }
 
-function GiphyStickers({ onSelect }: { onSelect: (s: string) => void }) {
+function Giphy({ onSelect, onClose }: { onSelect: (s: string) => void; onClose: () => void }) {
   const [q, setQuery] = useState('');
+  const [q_] = useDebounce(q, 200, { leading: false, maxWait: 1000 });
+
   const res = useSWR<{
     data: { id: string; images: { preview_gif: { url: string }; original: { url: string } } }[];
   }>(
-    `https://api.giphy.com/v1/stickers/search?api_key=EilKHJDlSoAHjFVugtLEDK6gqy2aR4V8&q=${q}&limit=25&offset=0&rating=G&lang=en1`,
+    q_.length > 0
+      ? `https://api.giphy.com/v1/gifs/search?api_key=${giphyApiKey}&q=${q_}&limit=12&offset=0&rating=G&lang=en1`
+      : null,
     fetchJson
   );
 
   return (
-    <div className={styles.gifTray}>
+    <div className={styles.gifTrayContent}>
       <div>
         <input
+          tabIndex={0}
           autoFocus
           placeholder="Search for gifs"
           type="text"
@@ -214,20 +227,35 @@ function GiphyStickers({ onSelect }: { onSelect: (s: string) => void }) {
           value={q}
           onChange={(e) => setQuery(e.target.value)}
           onKeyPress={(event) => {
-            if (res.data && event.key === 'Enter') {
+            if (res.data?.data[0] && event.key === 'Enter') {
               setQuery('');
               onSelect(res.data.data[0].images.original.url);
+            }
+
+            if (event.key === 'Esc') {
+              onClose();
             }
           }}
         />
       </div>
       <div className={styles.gifOptions}>
-        {res.data?.data.map((d) => (
+        {res.data?.data.map((d, i) => (
           <img
+            tabIndex={0}
             key={d.id}
-            className={styles.gif}
+            className={styles.gifPreview}
             src={d.images.preview_gif.url}
             alt=""
+            onKeyPress={(event) => {
+              if (res.data && event.key === 'Enter') {
+                setQuery('');
+                onSelect(d.images.original.url);
+              }
+
+              if (event.key === 'Esc') {
+                onClose();
+              }
+            }}
             onClick={() => {
               setQuery('');
               onSelect(d.images.original.url);
@@ -306,18 +334,38 @@ export default function Chill() {
           }
         }}
       />
-      {isGifDrawerOpen && (
-        <GiphyStickers
+      <Modal
+        isOpen={isGifDrawerOpen}
+        contentLabel="GIF picker"
+        className={styles.gifTray}
+        appElement={appEl}
+        style={{
+          overlay: {
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: null,
+          },
+        }}
+        onRequestClose={() => setIsGifDrawerOpen(false)}
+      >
+        <Giphy
           onSelect={(url) => {
             send('gif', url);
-            setIsGifDrawerOpen(false);
             emoteGif({
               gif: url,
               containerEl: emoteContainerRef.current!,
             });
+            setIsGifDrawerOpen(false);
+          }}
+          onClose={() => {
+            setIsGifDrawerOpen(false);
           }}
         />
-      )}
+      </Modal>
+
       <div className={styles.emotes} ref={emoteContainerRef}></div>
     </div>
   );

@@ -4,7 +4,7 @@ import { fetchJson } from 'helpers/fetchJson';
 import { signalingServerUrl } from 'config/site';
 import { Container, Input, Button, Box, Text } from 'theme-ui';
 
-export default function ChillLanding() {
+export default function GatherLanding() {
   const [room, setRoom] = useState<string>('');
 
   const createRoom = async () => {
@@ -13,7 +13,7 @@ export default function ChillLanding() {
       body: '',
     });
 
-    Router.push('/chill/[room]', `/chill/${res.room}`);
+    Router.push('/gather/[room]', `/gather/${res.room}`);
   };
 
   return (
@@ -22,7 +22,7 @@ export default function ChillLanding() {
         <form
           onSubmit={(ev) => {
             ev.preventDefault();
-            Router.push('/chill/[room]', `/chill/${room}`);
+            Router.push('/gather/[room]', `/gather/${room}`);
           }}
         >
           <Input

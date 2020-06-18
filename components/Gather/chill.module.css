@@ -99,19 +99,22 @@
 .emotesBar {
   user-select: none;
   position: absolute;
-  bottom: 10px;
+  bottom: 0px;
   left: 0;
   right: 0;
   display: flex;
-  justify-content: center;
+  /* justify-content: center; */
+  overflow-x: scroll;
+  padding-bottom: 10px;
 }
 
 .emoteButton {
   cursor: pointer;
-  font-size: 26pt;
+  font-size: 40pt;
   background: none;
   border: none;
-  margin: 0px 5px;
+  padding: 0px 15px;
+  margin: 0;
 }
 
 .emotes {
@@ -132,7 +135,7 @@
   font-size: 50pt;
 }
 
-.gifTray {
+.modal {
   position: absolute;
   width: 90vw;
   max-width: 540px;
@@ -141,7 +144,7 @@
   transform: translate(-50%, -50%);
 }
 
-.gifTrayContent {
+.modalContent {
   animation: popout 350ms ease-out;
   background-color: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(15px);
@@ -151,7 +154,7 @@
   box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.8);
 }
 
-.gifInput {
+.bigInput {
   width: 100%;
   box-sizing: border-box;
   font-size: 18pt;
@@ -184,4 +187,13 @@
 .gif {
   max-width: 90vw;
   border-radius: 8px;
+}
+
+.player {
+  position: absolute;
+  top: 50%;
+  left: 0%;
+  width: 100%;
+  margin: 0 auto;
+  transform: translate(0%, -50%);
 }

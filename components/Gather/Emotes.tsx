@@ -8,9 +8,6 @@ export function Emotes({ emoji, onClick }: { emoji: string[]; onClick: (s: strin
           {emoj}
         </button>
       ))}
-      <button onClick={() => onClick('gif')} className={styles.emoteButton} key={'gif'}>
-        GIF
-      </button>
     </div>
   );
 }

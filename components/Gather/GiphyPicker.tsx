@@ -25,14 +25,14 @@ export function GiphyPicker({
   );
 
   return (
-    <div className={styles.gifTrayContent}>
+    <div className={styles.modalContent}>
       <div>
         <input
           tabIndex={0}
           autoFocus
           placeholder="Search for gifs"
           type="text"
-          className={styles.gifInput}
+          className={styles.bigInput}
           value={q}
           onChange={(e) => setQuery(e.target.value)}
           onKeyPress={(event) => {

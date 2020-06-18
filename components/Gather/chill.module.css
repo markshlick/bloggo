@@ -103,17 +103,17 @@
   left: 0;
   right: 0;
   display: flex;
-  /* justify-content: center; */
+  justify-content: center;
   overflow-x: scroll;
   padding-bottom: 10px;
 }
 
 .emoteButton {
   cursor: pointer;
-  font-size: 40pt;
+  font-size: 25pt;
   background: none;
   border: none;
-  padding: 0px 15px;
+  padding: 0px 8px;
   margin: 0;
 }
 

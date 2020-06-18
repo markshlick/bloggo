@@ -1,54 +1,44 @@
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/router';
 import io from 'socket.io-client';
-import useSWR from 'swr';
 import Modal from 'react-modal';
-import { useDebounce } from 'use-debounce';
 
+import { signalingServerUrl, iceServers } from 'config/site';
+import { GiphyPicker } from 'components/Gather/GiphyPicker';
+import { Emotes } from 'components/Gather/Emotes';
+import { emote, emoteGif } from 'components/Gather/emote';
 import webrtc from 'helpers/webrtc';
-import { signalingServerUrl, giphyApiKey } from 'config/site';
-import { fetchJson } from 'helpers/fetchJson';
+import { debug } from 'helpers/debug';
 
-import styles from 'pages/chill/chill.module.css';
-
-const appEl = typeof window === 'undefined' ? undefined : document.getElementById('__next');
-
-const debug = (name: string, value?: any) => {
-  console.log(name, value);
-};
-
-const initVideoEl = ({ mute, stream, el }: any) => {
-  const videoEl = document.createElement('video');
-  videoEl.setAttribute('playsinline', '');
-
-  videoEl.onloadedmetadata = async () => {
-    el.appendChild(videoEl);
-
-    // browser quirk: programatically mute AFTER adding to dom
-    if (mute) {
-      videoEl.setAttribute('volume', '0');
-      videoEl.setAttribute('muted', 'muted');
-      videoEl.muted = true;
-    }
-
-    videoEl.play();
-  };
-
-  videoEl.srcObject = stream;
-
-  return videoEl;
-};
+import styles from 'components/Gather/chill.module.css';
 
 const run = async ({ remoteVideoContainerEl, localVideoContainerEl, onMessage, room }: any) => {
   let videoEls: Record<string, HTMLVideoElement> = {};
   let localVideoEL: HTMLVideoElement | null = null;
 
+  const initVideoEl = ({ mute, stream, el }: any) => {
+    const videoEl = document.createElement('video');
+    videoEl.setAttribute('playsinline', '');
+
+    videoEl.onloadedmetadata = async () => {
+      el.appendChild(videoEl);
+
+      // browser quirk: programatically mute AFTER adding to dom
+      if (mute) {
+        videoEl.setAttribute('volume', '0');
+        videoEl.setAttribute('muted', 'muted');
+        videoEl.muted = true;
+      }
+
+      videoEl.play();
+    };
+
+    videoEl.srcObject = stream;
+
+    return videoEl;
+  };
+
   const { handleSignalMessage, start, sendMessage, stop } = await webrtc({
-    iceServers: [
-      {
-        urls: 'stun:stun.l.google.com:19302',
-      },
-    ],
+    iceServers: iceServers,
     onDisconnected: ({ id }: { id: string }) => {
       if (videoEls[id]) {
         videoEls[id].remove();
@@ -121,154 +111,9 @@ const run = async ({ remoteVideoContainerEl, localVideoContainerEl, onMessage, r
   };
 };
 
-function randInt(a: number, b?: number) {
-  const min = b ? a : 0;
-  const max = b ? b : a;
-  return min + Math.floor(Math.random() * (max - min));
-}
-
-const html = (x: string) => {
-  const doc = new DOMParser().parseFromString(x, 'text/html');
-  return doc.body.firstChild;
-};
-
-const appendHtml = (el: Element, c: string) => {
-  const x = html(c);
-  x && el.appendChild(x);
-  return x;
-};
-
-const sleep = (t: number) => new Promise((n) => setTimeout(n, t));
-
-const emote = async ({ emoji, containerEl }: { emoji: string; containerEl: HTMLDivElement }) => {
-  const count = Math.random() * 15;
-  for (let index = 0; index < count; index++) {
-    const x1 = `rotate(${15 - Math.random() * 30}deg) translateX(${200 - Math.random() * 400}px)`;
-    const x2 = `rotate(${Math.random() * 360}deg) scale(${0.5 + Math.random() * 1})`;
-
-    await sleep(Math.random() * 100);
-
-    const el = appendHtml(
-      containerEl,
-      `
-      <div class="${styles.emoteA}" style="transform: ${x1};">
-        <div class="${styles.emoteB}">
-          <div style="transform: ${x2}">
-            ${emoji}
-          </div>
-        </div>
-      </div>
-    `
-    );
-
-    sleep(1200).then(() => el?.remove());
-  }
-};
-
-const emoteGif = async ({ gif, containerEl }: { gif: string; containerEl: HTMLDivElement }) => {
-  await new Promise((resolve, reject) => {
-    const img = new Image();
-    img.src = gif;
-    img.onload = resolve;
-    img.onerror = reject;
-  });
-
-  const el = appendHtml(
-    containerEl,
-    `
-    <div class="${styles.gifA}">
-      <div class="${styles.gifB}">
-        <img class="${styles.gif}" src="${gif}">
-      </div>
-    </div>
-  `
-  );
-
-  sleep(2500).then(() => el?.remove());
-};
-
-function Emotes({ emoji, onClick }: { emoji: string[]; onClick: (s: string) => void }) {
-  return (
-    <div className={styles.emotesBar}>
-      {emoji.map((emoj) => (
-        <button onClick={() => onClick(emoj)} className={styles.emoteButton} key={emoj}>
-          {emoj}
-        </button>
-      ))}
-      <button onClick={() => onClick('gif')} className={styles.emoteButton} key={'gif'}>
-        GIF
-      </button>
-    </div>
-  );
-}
-
-function Giphy({ onSelect, onClose }: { onSelect: (s: string) => void; onClose: () => void }) {
-  const [q, setQuery] = useState('');
-  const [q_] = useDebounce(q, 200, { leading: false, maxWait: 1000 });
-
-  const res = useSWR<{
-    data: { id: string; images: { preview_gif: { url: string }; original: { url: string } } }[];
-  }>(
-    q_.length > 0
-      ? `https://api.giphy.com/v1/gifs/search?api_key=${giphyApiKey}&q=${q_}&limit=12&offset=0&rating=G&lang=en1`
-      : null,
-    fetchJson
-  );
-
-  return (
-    <div className={styles.gifTrayContent}>
-      <div>
-        <input
-          tabIndex={0}
-          autoFocus
-          placeholder="Search for gifs"
-          type="text"
-          className={styles.gifInput}
-          value={q}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyPress={(event) => {
-            if (res.data?.data[0] && event.key === 'Enter') {
-              setQuery('');
-              onSelect(res.data.data[0].images.original.url);
-            }
-
-            if (event.key === 'Esc') {
-              onClose();
-            }
-          }}
-        />
-      </div>
-      <div className={styles.gifOptions}>
-        {res.data?.data.map((d, i) => (
-          <img
-            tabIndex={0}
-            key={d.id}
-            className={styles.gifPreview}
-            src={d.images.preview_gif.url}
-            alt=""
-            onKeyPress={(event) => {
-              if (res.data && event.key === 'Enter') {
-                setQuery('');
-                onSelect(d.images.original.url);
-              }
-
-              if (event.key === 'Esc') {
-                onClose();
-              }
-            }}
-            onClick={() => {
-              setQuery('');
-              onSelect(d.images.original.url);
-            }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
+const appEl = typeof window === 'undefined' ? undefined : document.getElementById('__next');
 
 export default function Chill() {
-  const router = useRouter();
   const [isGifDrawerOpen, setIsGifDrawerOpen] = useState(false);
   const webrtcRef = useRef<any>(null);
   const localVideoContainerRef = useRef<HTMLDivElement>(null);
@@ -282,6 +127,20 @@ export default function Chill() {
     });
   };
 
+  const handleMessage = (message: any) => {
+    if (message.type === 'emote') {
+      emote({
+        emoji: message.value,
+        containerEl: emoteContainerRef.current!,
+      });
+    } else if (message.type === 'gif') {
+      emoteGif({
+        gif: message.value,
+        containerEl: emoteContainerRef.current!,
+      });
+    }
+  };
+
   useEffect(() => {
     const room = window.location.pathname.split('/')[2];
 
@@ -289,19 +148,7 @@ export default function Chill() {
       room,
       remoteVideoContainerEl: remoteVideoContainerRef.current,
       localVideoContainerEl: localVideoContainerRef.current,
-      onMessage: (message: any) => {
-        if (message.type === 'emote') {
-          emote({
-            emoji: message.value,
-            containerEl: emoteContainerRef.current!,
-          });
-        } else if (message.type === 'gif') {
-          emoteGif({
-            gif: message.value,
-            containerEl: emoteContainerRef.current!,
-          });
-        }
-      },
+      onMessage: handleMessage,
     });
 
     webrtcPromise.then((client) => {
@@ -351,7 +198,7 @@ export default function Chill() {
         }}
         onRequestClose={() => setIsGifDrawerOpen(false)}
       >
-        <Giphy
+        <GiphyPicker
           onSelect={(url) => {
             send('gif', url);
             emoteGif({

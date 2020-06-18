@@ -33,6 +33,12 @@ export const fathomSiteId = 'PXLGGGJK';
 
 export const stripeSubscriptionPriceId = 'price_1GrXmtIZl1DrUnWJCIGqnUzW';
 
+export const iceServers = [
+  {
+    urls: 'stun:stun.l.google.com:19302',
+  },
+];
+
 // helpers
 
 export function url(pathname?: UrlObject['pathname'], query?: UrlObject['query']) {

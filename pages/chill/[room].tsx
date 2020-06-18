@@ -11,7 +11,7 @@ import { fetchJson } from 'helpers/fetchJson';
 
 import styles from 'pages/chill/chill.module.css';
 
-const appEl = typeof window === 'undefined' ? null : document.getElementById('__next');
+const appEl = typeof window === 'undefined' ? undefined : document.getElementById('__next');
 
 const debug = (name: string, value?: any) => {
   console.log(name, value);
@@ -338,7 +338,7 @@ export default function Chill() {
         isOpen={isGifDrawerOpen}
         contentLabel="GIF picker"
         className={styles.gifTray}
-        appElement={appEl}
+        appElement={appEl!}
         style={{
           overlay: {
             position: 'fixed',
@@ -346,7 +346,7 @@ export default function Chill() {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: null,
+            background: 'none',
           },
         }}
         onRequestClose={() => setIsGifDrawerOpen(false)}

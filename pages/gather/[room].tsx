@@ -115,7 +115,7 @@ const run = async ({ remoteVideoContainerEl, localVideoContainerEl, onMessage, r
 
 const appEl = typeof window === 'undefined' ? undefined : document.getElementById('__next');
 
-const MediaInput = ({ onSubmit }: { onSubmit: () => void }) => {
+const MediaInput = ({ onSubmit }: { onSubmit: (p: { url: string }) => void }) => {
   const formik = useFormik({
     initialValues: {
       url: '',
@@ -291,7 +291,7 @@ export default function Chill() {
         }}
         onRequestClose={() => setIsMediaInputOpen(false)}
       >
-        <MediaInput onSubmit={onAddMediaUrl} />
+        <MediaInput onSubmit={({ url }) => onAddMediaUrl({ url })} />
       </Modal>
 
       <div className={styles.emotes} ref={emoteContainerRef}></div>

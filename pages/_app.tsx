@@ -39,21 +39,23 @@ export default function App(props: AppProps) {
   const { Component, pageProps } = props;
   useAnalytics();
 
-  // @ts-ignore
-  if (Component.layout === 'none') {
-    return <Component {...pageProps} />;
-  }
-
   return (
     <>
       <AppContextProviders>
-        <Head>
-          <title>{title}</title>
-        </Head>
-        <Header />
-        <Container px={[3, null, 0]}>
+        {/* @ts-ignore */}
+        {Component.layout === 'none' ? (
           <Component {...pageProps} />
-        </Container>
+        ) : (
+          <>
+            <Head>
+              <title>{title}</title>
+            </Head>
+            <Header />
+            <Container px={[3, null, 0]}>
+              <Component {...pageProps} />
+            </Container>
+          </>
+        )}
       </AppContextProviders>
     </>
   );

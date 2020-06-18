@@ -13,6 +13,8 @@
     "@types/socket.io": "^2.1.8"
   },
   "dependencies": {
+    "express": "^4.17.1",
+    "project-name-generator": "^2.1.7",
     "socket.io": "^2.3.0"
   }
 }

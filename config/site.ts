@@ -18,9 +18,12 @@ export const rssFileName = 'rss.xml';
 
 export const rssFeedPath = `/_next/static/${rssFileName}`;
 
-export const signalingServer = 'https://chill.onrender.com/';
+export const signalingServerProd = 'https://chill.onrender.com';
 
-export const signalingServerDev = 'localhost:3001';
+export const signalingServerDev = 'http://localhost:3001';
+
+export const signalingServerUrl =
+  process.env.NODE_ENV === 'production' ? signalingServerProd : signalingServerDev;
 
 // keys
 

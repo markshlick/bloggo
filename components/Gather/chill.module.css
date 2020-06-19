@@ -192,10 +192,8 @@
 .player {
   position: absolute;
   top: 50%;
-  left: 0%;
-  width: 100%;
-  margin: 0 auto;
-  transform: translate(0%, -50%);
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .playerContent {
@@ -203,16 +201,18 @@
 }
 
 .playerClose {
+  cursor: pointer;
   position: absolute;
-  top: -50px;
-  right: 50px;
-  width: 40px;
-  height: 40px;
+  top: 0px;
+  right: -24px;
+  width: 22px;
+  height: 22px;
   color: white;
-  font-size: 40px;
-  line-height: 40px;
+  font-size: 15px;
+  line-height: 22px;
   border-radius: 50%;
-  border: none;
+  text-align: center;
   background: none;
-  background-color: rgba(0, 0, 0, 0.4);
+  border: none;
+  background-color: rgba(0, 0, 0, 0.8);
 }

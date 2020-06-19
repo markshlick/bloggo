@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import io from 'socket.io-client';
-import Modal from 'react-modal';
+import Modal, { Styles } from 'react-modal';
 import ReactPlayer from 'react-player';
-import { useFormik } from 'formik';
 
 import { signalingServerUrl, iceServers } from 'config/site';
 import { GiphyPicker } from 'components/Gather/GiphyPicker';
@@ -12,6 +11,8 @@ import webrtc from 'helpers/webrtc';
 import { debug } from 'helpers/debug';
 
 import styles from 'components/Gather/chill.module.css';
+import { MediaInput } from '../../components/Gather/MediaInput';
+import { usePreventZoom } from '../../helpers/usePreventZoom';
 
 const run = async ({ remoteVideoContainerEl, localVideoContainerEl, onMessage, room }: any) => {
   let videoEls: Record<string, HTMLVideoElement> = {};
@@ -37,6 +38,11 @@ const run = async ({ remoteVideoContainerEl, localVideoContainerEl, onMessage, r
     videoEl.srcObject = stream;
 
     return videoEl;
+  };
+
+  const handleUnload = function (event: BeforeUnloadEvent) {
+    stop();
+    delete event['returnValue'];
   };
 
   const { handleSignalMessage, start, sendMessage, stop } = await webrtc({
@@ -94,15 +100,13 @@ const run = async ({ remoteVideoContainerEl, localVideoContainerEl, onMessage, r
     start();
   });
 
-  window.addEventListener('beforeunload', function (e) {
-    stop();
-    delete e['returnValue'];
-  });
+  window.addEventListener('beforeunload', handleUnload);
 
   socket.open();
 
   return {
     stop: () => {
+      window.removeEventListener('beforeunload', handleUnload);
       localVideoEL?.remove();
       Object.values(videoEls).forEach((el) => el.remove());
       videoEls = {};
@@ -115,31 +119,45 @@ const run = async ({ remoteVideoContainerEl, localVideoContainerEl, onMessage, r
 
 const appEl = typeof window === 'undefined' ? undefined : document.getElementById('__next');
 
-const MediaInput = ({ onSubmit }: { onSubmit: (p: { url: string }) => void }) => {
-  const formik = useFormik({
-    initialValues: {
-      url: '',
-    },
-    onSubmit: onSubmit,
-  });
+const modalStyle: Styles = {
+  overlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'none',
+  },
+};
+
+function MediaPlayer({ mediaUrl, onClose }: { mediaUrl: string; onClose: () => void }) {
+  const playerRef = useRef<any>(null);
 
   return (
-    <div className={styles.modalContent}>
-      <form onSubmit={formik.handleSubmit}>
-        <input
-          autoFocus
-          className={styles.bigInput}
-          placeholder="Media URL (YouTube, Soundcloud, etc)"
-          id="url"
-          name="url"
-          onChange={formik.handleChange}
-          value={formik.values.url}
+    <div className={styles.player}>
+      <div className={styles.playerContent}>
+        <ReactPlayer
+          controls
+          ref={playerRef}
+          width="90vw"
+          height="calc(90vw * 0.5625)"
+          url={mediaUrl}
+          config={{
+            youtube: {
+              playerVars: {
+                autoplay: '1',
+              },
+              embedOptions: {},
+            },
+          }}
         />
-        <button type="submit">Submit</button>
-      </form>
+        <button aria-label="Close Media" className={styles.playerClose} onClick={onClose}>
+          ×
+        </button>
+      </div>
     </div>
   );
-};
+}
 
 export default function Chill() {
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
@@ -147,12 +165,32 @@ export default function Chill() {
   const [isMediaInputOpen, setIsMediaInputOpen] = useState(false);
 
   const webrtcRef = useRef<any>(null);
-  const playerRef = useRef<any>(null);
   const localVideoContainerRef = useRef<HTMLDivElement>(null);
   const remoteVideoContainerRef = useRef<HTMLDivElement>(null);
   const emoteContainerRef = useRef<HTMLDivElement>(null);
 
-  const send = (type: string, value: any) => {
+  usePreventZoom();
+
+  useEffect(() => {
+    const room = window.location.pathname.split('/')[2];
+
+    const webrtcPromise = run({
+      room,
+      remoteVideoContainerEl: remoteVideoContainerRef.current,
+      localVideoContainerEl: localVideoContainerRef.current,
+      onMessage: handleMessage,
+    });
+
+    webrtcPromise.then((client) => {
+      webrtcRef.current = client;
+    });
+
+    return () => {
+      webrtcPromise.then(({ stop }) => stop());
+    };
+  }, []);
+
+  const sendMessage = (type: string, value: any) => {
     webrtcRef.current?.sendMessage({
       type,
       value,
@@ -178,60 +216,16 @@ export default function Chill() {
   const onAddMediaUrl = ({ url }: { url: string }) => {
     setMediaUrl(url);
     setIsMediaInputOpen(false);
-    send('media', url);
+    sendMessage('media', url);
   };
-
-  useEffect(() => {
-    const room = window.location.pathname.split('/')[2];
-
-    const webrtcPromise = run({
-      room,
-      remoteVideoContainerEl: remoteVideoContainerRef.current,
-      localVideoContainerEl: localVideoContainerRef.current,
-      onMessage: handleMessage,
-    });
-
-    webrtcPromise.then((client) => {
-      webrtcRef.current = client;
-    });
-
-    return () => {
-      webrtcPromise.then(({ stop }) => {
-        stop();
-      });
-    };
-  }, []);
 
   return (
     <div className={styles.chill}>
       <div ref={localVideoContainerRef}></div>
       <div className={styles.friends} ref={remoteVideoContainerRef}></div>
-      {mediaUrl && (
-        <div className={styles.player}>
-          <div className={styles.playerContent}>
-            <ReactPlayer
-              ref={playerRef}
-              width="85vw"
-              height="calc(85vw * 0.5625)"
-              style={{
-                margin: '0 auto',
-              }}
-              config={{}}
-              url={mediaUrl}
-            />
-
-            <button
-              aria-label="Close Media"
-              className={styles.playerClose}
-              onClick={() => setMediaUrl(null)}
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
+      {mediaUrl && <MediaPlayer mediaUrl={mediaUrl} onClose={() => setMediaUrl(null)} />}
       <Emotes
-        emoji={['😍', '😂', '🔥', '🎉', '🖼', '🎬', '💩']}
+        options={['😍', '😂', '🔥', '🎉', '🖼', '🎬', '💩']}
         onClick={(e) => {
           if (e === '🖼') {
             setIsGifDrawerOpen(true);
@@ -243,7 +237,7 @@ export default function Chill() {
                 emoji: e,
                 containerEl: emoteContainerRef.current,
               });
-            send('emote', e);
+            sendMessage('emote', e);
           }
         }}
       />
@@ -253,21 +247,12 @@ export default function Chill() {
         contentLabel="GIF picker"
         className={styles.modal}
         appElement={appEl!}
-        style={{
-          overlay: {
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'none',
-          },
-        }}
+        style={modalStyle}
         onRequestClose={() => setIsGifDrawerOpen(false)}
       >
         <GiphyPicker
           onSelect={(url) => {
-            send('gif', url);
+            sendMessage('gif', url);
             emoteGif({
               gif: url,
               containerEl: emoteContainerRef.current!,
@@ -285,16 +270,7 @@ export default function Chill() {
         contentLabel="Media picker"
         className={styles.modal}
         appElement={appEl!}
-        style={{
-          overlay: {
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'none',
-          },
-        }}
+        style={modalStyle}
         onRequestClose={() => setIsMediaInputOpen(false)}
       >
         <MediaInput onSubmit={({ url }) => onAddMediaUrl({ url })} />

@@ -24,8 +24,6 @@ const initPeerConnection = async ({
   onDataMessage,
   onDataReady,
 }) => {
-  const stream = new MediaStream();
-
   const peerConnection = new RTCPeerConnection({
     iceServers,
   });
@@ -37,7 +35,7 @@ const initPeerConnection = async ({
 
   dataChannel.addEventListener('open', (event) => {
     state.canSendData = true;
-    onDataReady();
+    onDataReady(state);
   });
 
   dataChannel.addEventListener('message', (event) => {
@@ -47,9 +45,9 @@ const initPeerConnection = async ({
       peerConnection.close();
       state.canSendData = false;
       state.active = false;
-      onDisconnected({ id });
+      onDisconnected(state);
     } else {
-      onDataMessage(message.content || null);
+      onDataMessage(message.content || null, state);
     }
   });
 
@@ -72,7 +70,6 @@ const initPeerConnection = async ({
   const state = {
     id,
     peerConnection,
-    stream,
     close,
     sendMessage,
     dataChannel,
@@ -92,7 +89,7 @@ const initPeerConnection = async ({
     }
 
     if (state.readyForIce) {
-      onIceCandidate(event.candidate);
+      onIceCandidate(event.candidate, state);
     } else {
       state.iceCandidates.push(event.candidate);
     }
@@ -102,16 +99,17 @@ const initPeerConnection = async ({
   peerConnection.onaddstream = ({ stream }) => {
     // @ts-ignore
     if (!state.active) {
+      state.stream = stream;
       state.active = true;
-      onFirstTrack({ id, peerConnection, stream });
+      onFirstTrack(state);
     }
   };
 
-  peerConnection.addEventListener('connectionstatechange', (ev) => {
+  peerConnection.addEventListener('connectionstatechange', (event) => {
     // @ts-ignore
-    if (ev.target.iceConnectionState === 'disconnected') {
+    if (event.target.iceConnectionState === 'disconnected') {
       state.canSendData = false;
-      onDisconnected({ id });
+      onDisconnected(state);
     }
   });
 

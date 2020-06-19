@@ -20,8 +20,8 @@ export default function GatherLanding() {
     <Container>
       <Box p={10}>
         <form
-          onSubmit={(ev) => {
-            ev.preventDefault();
+          onSubmit={(event) => {
+            event.preventDefault();
             Router.push('/gather/[room]', `/gather/${room}`);
           }}
         >
@@ -29,7 +29,7 @@ export default function GatherLanding() {
             mb="2"
             type="text"
             placeholder="Your room's ID"
-            onChange={(ev) => setRoom(ev.target.value)}
+            onChange={(event) => setRoom(event.target.value)}
           />
           <Button type="submit" disabled={room.length === 0}>
             Join a room

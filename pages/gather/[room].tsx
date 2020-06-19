@@ -219,30 +219,42 @@ export default function Chill() {
     sendMessage('media', url);
   };
 
+  const handleEmote = (e: string): void => {
+    if (e === '🖼') {
+      setIsGifDrawerOpen(true);
+    } else if (e === '🎬') {
+      setIsMediaInputOpen(true);
+    } else {
+      emoteContainerRef.current &&
+        emote({
+          emoji: e,
+          containerEl: emoteContainerRef.current,
+        });
+      sendMessage('emote', e);
+    }
+  };
+
+  const handleGifPicked = (url: string) => {
+    sendMessage('gif', url);
+    emoteGif({
+      gif: url,
+      containerEl: emoteContainerRef.current!,
+    });
+    setIsGifDrawerOpen(false);
+  };
+
   return (
     <div className={styles.chill}>
-      <div ref={localVideoContainerRef}></div>
-      <div className={styles.friends} ref={remoteVideoContainerRef}></div>
+      <div key="localVideo" ref={localVideoContainerRef}></div>
+      <div key="remoteVideos" className={styles.friends} ref={remoteVideoContainerRef}></div>
       {mediaUrl && <MediaPlayer mediaUrl={mediaUrl} onClose={() => setMediaUrl(null)} />}
       <Emotes
+        key="emotePicker"
         options={['😍', '😂', '🔥', '🎉', '🖼', '🎬', '💩']}
-        onClick={(e) => {
-          if (e === '🖼') {
-            setIsGifDrawerOpen(true);
-          } else if (e === '🎬') {
-            setIsMediaInputOpen(true);
-          } else {
-            emoteContainerRef.current &&
-              emote({
-                emoji: e,
-                containerEl: emoteContainerRef.current,
-              });
-            sendMessage('emote', e);
-          }
-        }}
+        onClick={handleEmote}
       />
       <Modal
-        key={'gif'}
+        key="gif"
         isOpen={isGifDrawerOpen}
         contentLabel="GIF picker"
         className={styles.modal}
@@ -250,23 +262,11 @@ export default function Chill() {
         style={modalStyle}
         onRequestClose={() => setIsGifDrawerOpen(false)}
       >
-        <GiphyPicker
-          onSelect={(url) => {
-            sendMessage('gif', url);
-            emoteGif({
-              gif: url,
-              containerEl: emoteContainerRef.current!,
-            });
-            setIsGifDrawerOpen(false);
-          }}
-          onClose={() => {
-            setIsGifDrawerOpen(false);
-          }}
-        />
+        <GiphyPicker onSelect={handleGifPicked} onClose={() => setIsGifDrawerOpen(false)} />
       </Modal>
       <Modal
         isOpen={isMediaInputOpen}
-        key={'media'}
+        key="media"
         contentLabel="Media picker"
         className={styles.modal}
         appElement={appEl!}
@@ -275,8 +275,7 @@ export default function Chill() {
       >
         <MediaInput onSubmit={({ url }) => onAddMediaUrl({ url })} />
       </Modal>
-
-      <div className={styles.emotes} ref={emoteContainerRef}></div>
+      <div key="emotes" className={styles.emotes} ref={emoteContainerRef}></div>
     </div>
   );
 }

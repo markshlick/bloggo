@@ -6,15 +6,24 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "NODE_ENV=development PORT=3001 supervisor index.js",
+    "dev:v2": "NODE_ENV=development PORT=3001 tsc-watch --onSuccess 'node ./dist/httpSignaling.js'"
   },
   "devDependencies": {
+    "@types/express": "^4.17.6",
     "@types/node": "^14.0.13",
-    "@types/socket.io": "^2.1.8"
+    "@types/socket.io": "^2.1.8",
+    "ts-node": "^8.10.2",
+    "tsc-watch": "^4.2.8",
+    "typescript": "^3.9.5"
   },
   "dependencies": {
+    "base64id": "^2.0.0",
     "express": "^4.17.1",
+    "pretty-error": "^2.1.1",
     "project-name-generator": "^2.1.7",
-    "socket.io": "^2.3.0"
+    "socket.io": "^2.3.0",
+    "supervisor": "^0.12.0"
   }
 }

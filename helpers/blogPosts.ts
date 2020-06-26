@@ -32,7 +32,12 @@ export async function getPostsIndex(): Promise<BlogPost[]> {
     };
   });
 
-  return posts.filter(({ pub }) => pub).sort(sortBlogPostsByDate);
+  return posts
+    .filter(({ pub }) => {
+      if (process.env.NODE_ENV === 'development') return true;
+      return pub;
+    })
+    .sort(sortBlogPostsByDate);
 }
 
 export async function getPostsByCategoriesAndTags(): Promise<{

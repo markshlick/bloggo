@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import { CodeSurfer } from '@code-surfer/standalone';
 import { useSpring } from 'use-spring';
 import { useState, ComponentType } from 'react';
@@ -49,7 +51,7 @@ const steps: StepType[] = [
 ];
 
 export const meta = {
-  pub: true,
+  pub: false,
   title: 'Starting WebRTC',
   date: '2020-06-23T16:13:41Z',
   tags: ['meta'],

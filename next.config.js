@@ -1,6 +1,5 @@
 // @ts-check
 
-const rehypeWavesPlugin = require('rehype-waves');
 const withMdx = require('@next/mdx');
 
 const rssFeedFilePath = './scripts/rss.ts';
@@ -15,7 +14,10 @@ function withRss(nextConf) {
         config.entry = async () => {
           const baseEntries = await originalEntry();
           // This script imports components from the Next app, so it's transpiled
-          return { ...baseEntries, [rssFeedFilePath]: rssFeedFilePath };
+          return {
+            ...baseEntries,
+            [rssFeedFilePath]: rssFeedFilePath,
+          };
         };
       }
 
@@ -28,9 +30,6 @@ const pageExts = ['js', 'jsx', 'ts', 'tsx', 'md', 'mdx'];
 
 const withMdxOpts = {
   extension: /\.(md|mdx)$/,
-  options: {
-    rehypePlugins: [rehypeWavesPlugin],
-  },
 };
 
 function config() {

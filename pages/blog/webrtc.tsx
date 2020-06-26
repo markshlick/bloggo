@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 import { CodeSurfer } from '@code-surfer/standalone';
 import { useSpring } from 'use-spring';
 import { useState, ComponentType } from 'react';
@@ -30,7 +28,11 @@ Voluptatem eos rem minus similique expedita placeat aliquid laboriosam neque duc
 Quidem impedit autem magnam quae aliquam exercitationem cum odit quos laborum saepe deserunt soluta neque repudiandae provident magni molestias, possimus esse atque asperiores corporis minima natus delectus consequatur. Enim, officiis.
 Commodi totam eum, vitae inventore aut voluptatibus saepe nostrum deleniti omnis obcaecati placeat soluta eos esse harum aliquam quos nesciunt vero error quaerat. Nisi cum repellendus placeat repudiandae, reprehenderit numquam!`;
 
-type StepType = { Content: ComponentType; focus: string };
+type StepType = {
+  Content: ComponentType;
+  focus: string;
+  file: string;
+};
 
 const steps: StepType[] = [
   {
@@ -57,7 +59,13 @@ export const meta = {
   tags: ['meta'],
 };
 
-const Code = ({ steps, step }) => {
+const Code = ({
+  steps,
+  step,
+}: {
+  steps: StepType[];
+  step: number;
+}) => {
   const [currentStep] = useSpring(step, {
     decimals: 3,
     stiffness: 24,
@@ -101,7 +109,7 @@ const Post = () => {
           boxSizing: 'border-box',
         }}
       >
-        <Scroller onStepChange={(i) => setStep(i)}>
+        <Scroller onStepChange={(i: number) => setStep(i)}>
           {steps.map(({ Content }, i) => (
             <Step key={i} index={i}>
               <div

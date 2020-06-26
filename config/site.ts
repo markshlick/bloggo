@@ -22,6 +22,15 @@ export const rssFeedPath = `/_next/static/${rssFileName}`;
 
 export const fathomSiteId = 'PXLGGGJK';
 
+export const stripeSubscriptionPriceId =
+  'price_1GrXmtIZl1DrUnWJCIGqnUzW';
+
+export const iceServers = [
+  {
+    urls: 'stun:stun.l.google.com:19302',
+  },
+];
+
 // helpers
 
 export function url(

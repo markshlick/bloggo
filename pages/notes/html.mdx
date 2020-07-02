@@ -7,7 +7,7 @@ export const meta = {
 
 <h1>{meta.title}</h1>
 
-Our old friend `element.innerHtml = '...'` is great, but occasionally I need more control over the elements I create. (for example, appending multiple children to the same parent, then selectively removing some later)
+Our old friend `element.innerHtml = '...'` is great, but sometimes I need more control over the nodes I create, for example, appending multiple child nodes to the same parent, then selectively removing a few later.
 
 For times like these, I reach for my ultra-tiny templating library, powered by tagged template literals and a browser API called `DOMParser`.
 
@@ -31,7 +31,7 @@ const node = template({
 document.getElementById('parent').appendChild(node);
 ```
 
-The `html` function is an example of a **tagged template literal** - for more info on how they work, check out [Wes Bos' intro][bos-ttls]
+The `html` function is an example of a **tagged template literal** - for more info on how they work, check out [Wes Bos' sick intro][bos-ttls].
 
 `dom` parses the raw strings into a DOM Node tree.
 

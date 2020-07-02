@@ -12,7 +12,7 @@ Our old friend `element.innerHtml = '...'` is great, but occasionally I need mor
 For times like these, I reach for my ultra-tiny templating library, powered by tagged template literals and a browser API called `DOMParser`.
 
 ```typescript
-const myTemplate = ({ name, things }) =>
+const template = ({ name, things }) =>
   dom(html`
     <div class="${css.things}"">
       <p>Hello ${name}</p>
@@ -23,7 +23,7 @@ const myTemplate = ({ name, things }) =>
     </div>
   `);
 
-const node = myTemplate({
+const node = template({
   name: 'Mark',
   things: [1, 2, 3, 4],
 });
@@ -31,17 +31,21 @@ const node = myTemplate({
 document.getElementById('parent').appendChild(node);
 ```
 
+The `html` function is an example of a **tagged template literal** - for more info on how they work, check out [Wes Bos' intro][bos-ttls]
+
+`dom` parses the raw strings into a DOM Node tree.
+
 ### Show me the code!
 
 ```typescript
-const html = (template, ...args) => {
-  return template
-    .map((ss, i) => {
-      let e = args[i];
-      if (Array.isArray(e)) {
-        e = e.join('');
+const html = (templateChunks, ...interpolatedValues) => {
+  return templateChunks
+    .map((chunk, i) => {
+      let value = interpolatedValues[i] || '';
+      if (Array.isArray(value)) {
+        value = value.join('');
       }
-      return `${ss}${e || ''}`;
+      return `${chunk}${value}`;
     })
     .join('');
 };
@@ -57,7 +61,8 @@ const dom = (text) => {
 
 Bonus: If you're a VSCode user, you can use [es6-string-html][vsc-hi] plugin to get inline syntax highlighting for your `html` strings! 🔥
 
-(And apparently [my website's syntax highlighter][rehype-prism] is smart enought to detect `html`, too! 🤯)
+(And apparently [my website's syntax highlighter][rehype-prism] is smart enough to detect `html`, too! 🤯)
 
+[bos-ttls]: https://wesbos.com/tagged-template-literals
 [rehype-prism]: https://github.com/mapbox/rehype-prism
 [vsc-hi]: https://marketplace.visualstudio.com/items?itemName=Tobermory.es6-string-html

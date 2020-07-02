@@ -2,7 +2,7 @@ import URL, { UrlObject } from 'url';
 
 // names
 
-export const title = 'mark shlick';
+export const title = 'mksh.io';
 
 export const moji = '🌲';
 

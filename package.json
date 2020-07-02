@@ -4,7 +4,6 @@
   "private": true,
   "scripts": {
     "dev": "next",
-    "dev:backends": "next & NODE_ENV=development PORT=3001 node ext/signal-serv",
     "build": "next build && yarn build:rss",
     "build:rss": "node ./scripts/buildRss.js",
     "export": "next export"
@@ -12,6 +11,7 @@
   "dependencies": {
     "@auth0/auth0-spa-js": "^1.9.0",
     "@code-surfer/standalone": "^3.1.1",
+    "@mapbox/rehype-prism": "^0.5.0",
     "@mdx-js/loader": "^1.6.4",
     "@next/mdx": "^9.4.2",
     "@stripe/react-stripe-js": "^1.1.2",
@@ -19,6 +19,7 @@
     "formik": "^2.1.4",
     "lodash": "^4.17.15",
     "next": "9.4.0",
+    "prismjs": "^1.20.0",
     "raw-loader": "^4.0.1",
     "react": "16.13.1",
     "react-dom": "16.13.1",

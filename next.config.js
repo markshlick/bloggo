@@ -1,6 +1,7 @@
 // @ts-check
 
 const withMdx = require('@next/mdx');
+const rehypePrism = require('@mapbox/rehype-prism');
 
 const rssFeedFilePath = './scripts/rss.ts';
 
@@ -30,6 +31,9 @@ const pageExts = ['js', 'jsx', 'ts', 'tsx', 'md', 'mdx'];
 
 const withMdxOpts = {
   extension: /\.(md|mdx)$/,
+  options: {
+    rehypePlugins: [rehypePrism],
+  },
 };
 
 function config() {

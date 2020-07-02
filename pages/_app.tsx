@@ -1,4 +1,5 @@
 import './app.css';
+import './code.css';
 import { useEffect } from 'react';
 import {
   ThemeProvider,
@@ -70,7 +71,7 @@ export default function App(props: AppProps) {
             <title>{title}</title>
           </Head>
           <Header />
-          <Container px={[3, null, 0]}>
+          <Container px={[3, null, 0]} mb={4}>
             <Component {...pageProps} />
           </Container>
         </>

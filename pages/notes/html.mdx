@@ -1,0 +1,63 @@
+export const meta = {
+  pub: true,
+  title: 'Dead-simple HTML templating',
+  date: '2020-07-02T02:20:26Z',
+  tags: ['vanilla js'],
+};
+
+<h1>{meta.title}</h1>
+
+Our old friend `element.innerHtml = '...'` is great, but occasionally I need more control over the elements I create. (for example, appending multiple children to the same parent, then selectively removing some later)
+
+For times like these, I reach for my ultra-tiny templating library, powered by tagged template literals and a browser API called `DOMParser`.
+
+```typescript
+const myTemplate = ({ name, things }) =>
+  dom(html`
+    <div class="${css.things}"">
+      <p>Hello ${name}</p>
+      <h2>Here are some things:</h2>
+      <ul>
+        ${things.map((thing) => html`<li>${thing}</li>`)}
+      </ul>
+    </div>
+  `);
+
+const node = myTemplate({
+  name: 'Mark',
+  things: [1, 2, 3, 4],
+});
+
+document.getElementById('parent').appendChild(node);
+```
+
+### Show me the code!
+
+```typescript
+const html = (template, ...args) => {
+  return template
+    .map((ss, i) => {
+      let e = args[i];
+      if (Array.isArray(e)) {
+        e = e.join('');
+      }
+      return `${ss}${e || ''}`;
+    })
+    .join('');
+};
+
+const dom = (text) => {
+  const doc = new DOMParser().parseFromString(
+    text,
+    'text/html',
+  );
+  return doc.body.firstChild;
+};
+```
+
+Bonus: If you're a VSCode user, you can use [es6-string-html][vsc-hi] plugin to get inline syntax highlighting for your `html` strings! 🔥
+
+(And apparently [my website's syntax highlighter][rehype-prism] is smart enought to detect `html`, too! 🤯)
+
+[rehype-prism]: https://github.com/mapbox/rehype-prism
+[vsc-hi]: https://marketplace.visualstudio.com/items?itemName=Tobermory.es6-string-html

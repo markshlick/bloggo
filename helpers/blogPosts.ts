@@ -11,19 +11,28 @@ interface BlogPostBase {
   image?: string;
 }
 
-export interface BlogPost extends BlogPostBase {
+export interface Post extends BlogPostBase {
   slug: string;
   path: string;
 }
 
-const sortBlogPostsByDate = (post1: BlogPost, post2: BlogPost): 1 | -1 =>
+const sortBlogPostsByDate = (
+  post1: Post,
+  post2: Post,
+): 1 | -1 =>
   new Date(post1.date) > new Date(post2.date) ? -1 : 1;
 
-export async function getPostsIndex(): Promise<BlogPost[]> {
-  const postFileNames = await fs.readdir('./pages/blog');
+export async function getPostsIndex(
+  rootPath: string,
+): Promise<Post[]> {
+  const postFileNames = await fs.readdir(
+    `./pages/${rootPath}`,
+  );
 
-  const posts: BlogPost[] = postFileNames.map((name) => {
-    const blogPost: { meta: BlogPostBase } = require(`../pages/blog/${name}`);
+  const posts: Post[] = postFileNames.map((name) => {
+    const blogPost: {
+      meta: BlogPostBase;
+    } = require(`../pages/${rootPath}/${name}`);
     const slug = path.parse(name).name;
     return {
       ...blogPost.meta,
@@ -34,17 +43,18 @@ export async function getPostsIndex(): Promise<BlogPost[]> {
 
   return posts
     .filter(({ pub }) => {
-      if (process.env.NODE_ENV === 'development') return true;
+      if (process.env.NODE_ENV === 'development')
+        return true;
       return pub;
     })
     .sort(sortBlogPostsByDate);
 }
 
 export async function getPostsByCategoriesAndTags(): Promise<{
-  tags: Map<string, BlogPost[]>;
-  categories: Map<string, BlogPost[]>;
+  tags: Map<string, Post[]>;
+  categories: Map<string, Post[]>;
 }> {
-  const blogPosts = await getPostsIndex();
+  const blogPosts = await getPostsIndex('blog');
 
   const tags = new Map();
   const categories = new Map();

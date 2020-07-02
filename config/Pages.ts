@@ -3,6 +3,10 @@ export default {
     href: `/blog/${slug}`,
     as: `/blog/${slug}`,
   }),
+  note: ({ slug }: { slug: string }) => ({
+    href: `/notes/${slug}`,
+    as: `/notes/${slug}`,
+  }),
   home: () => ({
     href: '/',
     as: '/',

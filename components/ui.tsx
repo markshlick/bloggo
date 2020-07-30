@@ -46,9 +46,12 @@ export const Right = ({
 );
 
 export const Space = ({
+  s,
   children,
-}: PropsWithChildren<{}>) => (
-  <div className="space">{children}</div>
+}: PropsWithChildren<{ s?: boolean }>) => (
+  <div className={s ? 'space-small' : 'space'}>
+    {children}
+  </div>
 );
 
 export const SpaceInline = ({

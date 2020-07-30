@@ -1,17 +1,37 @@
 :root {
-  --color-primary: black;
+  --color-primary: #191919;
   --color-action: blue;
   --color-action-bg: pink;
   --color-action-secondary: violet;
   --color-dim: lightgray;
-  --color-bg: white;
+  --color-bg: #f9f9f9;
 }
 
 .dark-mode {
-  --color-primary: white;
+  --color-primary: #f9f9f9;
   --color-action: violet;
   --color-action-bg: darkslateblue;
   --color-action-secondary: deepskyblue;
   --color-dim: gray;
-  --color-bg: black;
+  --color-bg: #11061d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-primary: #fff;
+    --color-action: violet;
+    --color-action-bg: darkslateblue;
+    --color-action-secondary: deepskyblue;
+    --color-dim: gray;
+    --color-bg: #11061d;
+  }
+
+  .dark-mode {
+    --color-primary: #191919;
+    --color-action: blue;
+    --color-action-bg: pink;
+    --color-action-secondary: violet;
+    --color-dim: lightgray;
+    --color-bg: #fff;
+  }
 }

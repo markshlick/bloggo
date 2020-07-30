@@ -29,6 +29,7 @@ pre[class*='language-'] {
   hyphens: none;
   background: #0b1c2c;
   color: #cbd6e2;
+  border-radius: 3px;
 }
 
 pre[class*='language-']::-moz-selection,
@@ -50,7 +51,6 @@ code[class*='language-'] ::selection {
 /* Code blocks */
 pre[class*='language-'] {
   padding: 1em;
-  margin: 0.5em 0;
   overflow: auto;
 }
 

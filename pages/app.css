@@ -18,14 +18,17 @@ body {
   font-family: system-ui, sans-serif;
   color: var(--color-primary);
   background-color: var(--color-bg);
+  transition: background-color 200ms;
 }
 
 a {
   text-decoration: none;
   color: var(--color-action);
-  padding: 4px;
-  margin-left: -4px;
-  margin-right: -4px;
+  font-weight: 900;
+  padding: 6px;
+  margin-left: -6px;
+  margin-right: -6px;
+  transition: color, background-color 200ms;
 }
 
 a:active {
@@ -113,6 +116,10 @@ code {
   margin-bottom: 16px;
 }
 
+.space-small {
+  margin-bottom: 8px;
+}
+
 .space-inline {
   margin-right: 16px;
 }
@@ -137,6 +144,7 @@ code {
 }
 
 .button-unstyled {
+  color: var(--color-action);
   border: none;
   background: none;
 }

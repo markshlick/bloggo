@@ -1,6 +1,6 @@
 import { GetStaticProps } from 'next';
 import Link from 'components/Link';
-import { Section } from 'components/ui';
+import { Section, Space } from 'components/ui';
 import Pages from 'config/Pages';
 import { getPostsIndex, Post } from 'helpers/blogPosts';
 
@@ -26,13 +26,13 @@ export default function Home({
         <h2>/blog/</h2>
         <div>
           {posts.map(({ title, slug, tags }) => (
-            <div key={slug}>
+            <Space key={slug} s>
               <strong>
                 <Link to={Pages.blogPost({ slug })}>
                   {title}
                 </Link>
               </strong>
-            </div>
+            </Space>
           ))}
         </div>
       </Section>
@@ -41,13 +41,13 @@ export default function Home({
         <h2>/notes/</h2>
         <div>
           {notes.map(({ title, slug, tags }) => (
-            <div key={slug}>
+            <Space key={slug} s>
               <strong>
                 <Link to={Pages.note({ slug })}>
                   {title}
                 </Link>
               </strong>
-            </div>
+            </Space>
           ))}
         </div>
       </Section>

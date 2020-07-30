@@ -59,6 +59,7 @@ const Ribbon = () => (
       {['action', 'action-secondary', 'action-bg'].map(
         (name) => (
           <div
+            key={name}
             style={{
               height: 4,
               flex: 1,
@@ -133,15 +134,15 @@ function Header({
             <SpaceInline>
               <Link to={Pages.about()}>about</Link>
             </SpaceInline>
-            <big>
+            <>
               <ButtonUnstyled
                 onClick={() =>
                   onClickDarkModeToggle(!darkMode)
                 }
               >
-                {darkMode ? '☀️' : '🌘'}
+                ☼
               </ButtonUnstyled>
-            </big>
+            </>
           </Space>
         </Right>
         {/* {isAuthenticated ? (

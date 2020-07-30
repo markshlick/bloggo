@@ -1,6 +1,6 @@
-import { Heading, Grid, Box, Badge } from 'theme-ui';
 import { GetStaticProps } from 'next';
 import Link from 'components/Link';
+import { Section } from 'components/ui';
 import Pages from 'config/Pages';
 import { getPostsIndex, Post } from 'helpers/blogPosts';
 
@@ -22,37 +22,35 @@ export default function Home({
 }) {
   return (
     <>
-      <Box my={3}>
-        <Heading as="h2">/blog/</Heading>
-      </Box>
-      <Grid gap={3} columns={[null, 2, 3]}>
-        {posts.map(({ title, slug, tags }) => (
-          <Box key={slug}>
-            <Box>
-              <Link
-                variant="nav"
-                to={Pages.blogPost({ slug })}
-              >
-                {title}
-              </Link>
-            </Box>
-          </Box>
-        ))}
-      </Grid>
-      <Box my={3}>
-        <Heading as="h2">/notes/</Heading>
-      </Box>
-      <Grid gap={3} columns={[null, 2, 3]}>
-        {notes.map(({ title, slug, tags }) => (
-          <Box key={slug}>
-            <Box>
-              <Link variant="nav" to={Pages.note({ slug })}>
-                {title}
-              </Link>
-            </Box>
-          </Box>
-        ))}
-      </Grid>
+      <Section>
+        <h2>/blog/</h2>
+        <div>
+          {posts.map(({ title, slug, tags }) => (
+            <div key={slug}>
+              <strong>
+                <Link to={Pages.blogPost({ slug })}>
+                  {title}
+                </Link>
+              </strong>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section>
+        <h2>/notes/</h2>
+        <div>
+          {notes.map(({ title, slug, tags }) => (
+            <div key={slug}>
+              <strong>
+                <Link to={Pages.note({ slug })}>
+                  {title}
+                </Link>
+              </strong>
+            </div>
+          ))}
+        </div>
+      </Section>
     </>
   );
 }

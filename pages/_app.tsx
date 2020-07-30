@@ -1,17 +1,19 @@
 import './app.css';
+import './theme.css';
 import './code.css';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  ThemeProvider,
-  Container,
-  Flex,
+  PageContainer,
+  Section,
   Box,
-} from 'theme-ui';
+  Right,
+  Space,
+  SpaceInline,
+  ButtonUnstyled,
+} from 'components/ui';
 import { AppProps } from 'next/app';
-import theme from 'config/theme';
 import Pages from 'config/Pages';
 import Link from 'components/Link';
-import { Link as ThemeUILink } from 'theme-ui';
 
 import { title, fathomSiteId, moji } from 'config/site';
 import Head from 'next/head';
@@ -29,11 +31,9 @@ const auth0InitOptions = {
 const AppContextProviders = ({
   children,
 }: React.PropsWithChildren<{}>) => (
-  <ThemeProvider theme={theme}>
-    <Auth0Provider initOptions={auth0InitOptions}>
-      {children}
-    </Auth0Provider>
-  </ThemeProvider>
+  <Auth0Provider initOptions={auth0InitOptions}>
+    {children}
+  </Auth0Provider>
 );
 
 const useAnalytics = () => {
@@ -55,9 +55,18 @@ const useAnalytics = () => {
 
 export default function App(props: AppProps) {
   const { Component, pageProps } = props;
-
   // @ts-ignore
   const noHeader = Component.layout === 'none';
+
+  const [darkMode, setDarkMode] = useState(false);
+
+  useEffect(() => {
+    if (darkMode) {
+      document.body.classList.add('dark-mode');
+    } else {
+      document.body.classList.remove('dark-mode');
+    }
+  }, [darkMode]);
 
   useAnalytics();
 
@@ -70,38 +79,57 @@ export default function App(props: AppProps) {
           <Head>
             <title>{title}</title>
           </Head>
-          <Header />
-          <Container px={[3, null, 0]} mb={4}>
+          <PageContainer>
+            <Header
+              darkMode={darkMode}
+              onClickDarkModeToggle={setDarkMode}
+            />
             <Component {...pageProps} />
-          </Container>
+          </PageContainer>
         </>
       )}
     </AppContextProviders>
   );
 }
 
-function Header() {
+function Header({
+  darkMode,
+  onClickDarkModeToggle,
+}: {
+  darkMode: boolean;
+  onClickDarkModeToggle: (d: boolean) => void;
+}) {
   // const { login, logout, isAuthenticated, user } = useAuth0();
 
   return (
-    <Container px={[3, null, 0]}>
-      <Flex my="2" sx={{ alignItems: 'center' }}>
-        <Box sx={{ flex: '1 1 auto' }}>
-          <Link variant="big" to={Pages.home()}>
+    <Section>
+      <Box>
+        <h1>
+          <Link to={Pages.home()}>
             {moji} {title}
           </Link>
-        </Box>
-        <Box>
-          <Link variant="nav" mr="2" to={Pages.about()}>
-            about
-          </Link>
-          {/* {isAuthenticated ? (
+        </h1>
+        <Right>
+          <Space>
+            <SpaceInline>
+              <Link to={Pages.about()}>about</Link>
+            </SpaceInline>
+            <ButtonUnstyled
+              onClick={() =>
+                onClickDarkModeToggle(!darkMode)
+              }
+            >
+              {darkMode ? '☀️' : '🌑'}
+            </ButtonUnstyled>
+          </Space>
+        </Right>
+        {/* {isAuthenticated ? (
             <ThemeUILink onClick={() => logout()} variant="nav">
               log out
             </ThemeUILink>
           ) : (
             <>
-              <Link variant="nav" mr="2" to={Pages.subscribe()}>
+              <Link to={Pages.subscribe()}>
                 subscribe
               </Link>
               <ThemeUILink onClick={() => login()} variant="nav">
@@ -109,8 +137,7 @@ function Header() {
               </ThemeUILink>
             </>
           )} */}
-        </Box>
-      </Flex>
-    </Container>
+      </Box>
+    </Section>
   );
 }

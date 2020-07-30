@@ -11,6 +11,7 @@
   "dependencies": {
     "@auth0/auth0-spa-js": "^1.9.0",
     "@code-surfer/standalone": "^3.1.1",
+    "@emotion/core": "^10.0.0",
     "@mapbox/rehype-prism": "^0.5.0",
     "@mdx-js/loader": "^1.6.4",
     "@next/mdx": "^9.4.2",
@@ -32,7 +33,7 @@
     "socket.io-client": "^2.3.0",
     "stripe": "^8.56.0",
     "swr": "^0.2.3",
-    "theme-ui": "^0.3.1",
+    "theme-ui": "^0.2.41",
     "use-debounce": "^3.4.2",
     "use-spring": "^0.2.3",
     "webrtc-adapter": "^7.6.2"
@@ -43,7 +44,6 @@
     "@types/react-modal": "^3.10.5",
     "@types/rss": "^0.0.28",
     "@types/socket.io-client": "^1.4.33",
-    "@types/theme-ui": "^0.3.2",
     "babel-plugin-preval": "^5.0.0",
     "typescript": "^3.9.2"
   }

@@ -1,10 +1,16 @@
 import { FormEvent, useState } from 'react';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import {
+  Elements,
+  CardElement,
+  useStripe,
+  useElements,
+} from '@stripe/react-stripe-js';
 import { loadStripe, Stripe } from '@stripe/stripe-js';
-import { Button, Box, Flex, Input, Heading, useThemeUI } from 'theme-ui';
 import { stripeSubscriptionPriceId } from 'config/site';
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+const stripePromise = loadStripe(
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
+);
 
 function handleSubscriptionResponse(
   stripe: Stripe,
@@ -12,10 +18,16 @@ function handleSubscriptionResponse(
     paymentMethodId,
     priceId,
     subscription,
-  }: { paymentMethodId: string; priceId: string; subscription: unknown }
+  }: {
+    paymentMethodId: string;
+    priceId: string;
+    subscription: any;
+  },
 ) {
   // @ts-ignore
-  const { payment_intent: paymentIntent } = subscription.latest_invoice;
+  const {
+    payment_intent: paymentIntent,
+  } = subscription.latest_invoice;
 
   if (paymentIntent.status === 'requires_action') {
     return stripe
@@ -29,7 +41,9 @@ function handleSubscriptionResponse(
           // The card was declined (i.e. insufficient funds, card has expired, etc)
           throw result;
         } else {
-          if (result.paymentIntent?.status === 'succeeded') {
+          if (
+            result.paymentIntent?.status === 'succeeded'
+          ) {
             // There's a risk of the customer closing the window before callback
             // execution. To handle this case, set up a webhook endpoint and
             // listen to invoice.payment_succeeded. This webhook endpoint
@@ -57,7 +71,7 @@ async function subscribe(
   }: {
     paymentMethodId: string;
     priceId: string;
-  }
+  },
 ) {
   const result = await (
     await fetch('/api/subscribe', {
@@ -77,16 +91,23 @@ async function subscribe(
     throw result;
   }
 
-  return handleSubscriptionResponse(stripe, { paymentMethodId, priceId, subscription: result });
+  return handleSubscriptionResponse(stripe, {
+    paymentMethodId,
+    priceId,
+    subscription: result,
+  });
 }
 
 const CheckoutForm = () => {
-  const [isFormDisabled, setIsFormDisabled] = useState(false);
-  const { theme } = useThemeUI();
+  const [isFormDisabled, setIsFormDisabled] = useState(
+    false,
+  );
   const stripe = useStripe();
   const elements = useElements();
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
     // Block native form submission.
     event.preventDefault();
 
@@ -100,7 +121,10 @@ const CheckoutForm = () => {
     const cardElement = elements.getElement(CardElement);
 
     // Use your card Element with other Stripe.js APIs
-    const { error, paymentMethod } = await stripe.createPaymentMethod({
+    const {
+      error,
+      paymentMethod,
+    } = await stripe.createPaymentMethod({
       type: 'card',
       card: cardElement!,
     });
@@ -124,42 +148,36 @@ const CheckoutForm = () => {
 
   return (
     <form onSubmit={handleSubmit}>
-      <Box my="3">
-        <Heading>Subscribe for $1.50/mo</Heading>
-      </Box>
-      <Box my="3">
-        <Input type="email" name="email" id="email" placeholder="you@email.co" />
-      </Box>
-      <Box
-        my="3"
-        py="2"
-        px="2"
-        sx={{
-          borderColor: 'text',
-          borderWidth: '1px',
-          borderStyle: 'solid',
-          borderRadius: '5px',
-        }}
-      >
+      <div>
+        <h2>Subscribe for $1.50/mo</h2>
+      </div>
+      <div>
+        <input
+          type="email"
+          name="email"
+          id="email"
+          placeholder="you@email.co"
+        />
+      </div>
+      <div>
         <CardElement
           options={{
             style: {
-              base: {
-                fontSize: theme!.fontSizes![2] + 'px',
-                lineHeight: '28px',
-                fontFamily: (theme!.fonts as Record<string, string>).body,
-              },
+              base: {},
             },
           }}
         />
-      </Box>
-      <Flex sx={{ justifyContent: 'flex-end' }}>
-        <Box>
-          <Button type="submit" disabled={!stripe || isFormDisabled}>
+      </div>
+      <div>
+        <div>
+          <button
+            type="submit"
+            disabled={!stripe || isFormDisabled}
+          >
             Subscribe
-          </Button>
-        </Box>
-      </Flex>
+          </button>
+        </div>
+      </div>
     </form>
   );
 };

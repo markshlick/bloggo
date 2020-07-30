@@ -1,29 +1,25 @@
 import NextLink from 'next/link';
-import { Link as ThemeUILink, LinkProps } from 'theme-ui';
-import { PropsWithChildren } from 'react';
+import { PropsWithChildren, CSSProperties } from 'react';
+import { Styles } from './ui';
 
 export default function Link({
   to: { href, as },
-  variant,
   children,
-  ...props
+  className,
+  style,
 }: PropsWithChildren<
-  LinkProps & {
-    variant?: string;
+  Styles & {
     to: {
       href: string;
       as: string;
     };
   }
 >) {
-  const themeLinkProps: LinkProps & { variant?: string } = { ...props };
-  if (variant) {
-    themeLinkProps.variant = variant;
-  }
-
   return (
     <NextLink passHref href={href} as={as}>
-      <ThemeUILink {...themeLinkProps}>{children}</ThemeUILink>
+      <a className={className} style={style}>
+        {children}
+      </a>
     </NextLink>
   );
 }

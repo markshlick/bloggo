@@ -53,6 +53,24 @@ const useAnalytics = () => {
   }, []);
 };
 
+const Ribbon = () => (
+  <>
+    <Box>
+      {['action', 'action-secondary', 'action-bg'].map(
+        (name) => (
+          <div
+            style={{
+              height: 4,
+              flex: 1,
+              backgroundColor: `var(--color-${name})`,
+            }}
+          />
+        ),
+      )}
+    </Box>
+  </>
+);
+
 export default function App(props: AppProps) {
   const { Component, pageProps } = props;
   // @ts-ignore
@@ -72,6 +90,7 @@ export default function App(props: AppProps) {
 
   return (
     <AppContextProviders>
+      <Ribbon />
       {noHeader ? (
         <Component {...pageProps} />
       ) : (
@@ -114,13 +133,15 @@ function Header({
             <SpaceInline>
               <Link to={Pages.about()}>about</Link>
             </SpaceInline>
-            <ButtonUnstyled
-              onClick={() =>
-                onClickDarkModeToggle(!darkMode)
-              }
-            >
-              {darkMode ? '☀️' : '🌑'}
-            </ButtonUnstyled>
+            <big>
+              <ButtonUnstyled
+                onClick={() =>
+                  onClickDarkModeToggle(!darkMode)
+                }
+              >
+                {darkMode ? '☀️' : '🌘'}
+              </ButtonUnstyled>
+            </big>
           </Space>
         </Right>
         {/* {isAuthenticated ? (

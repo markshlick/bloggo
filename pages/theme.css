@@ -1,17 +1,17 @@
 :root {
-  --color-primary: #000;
+  --color-primary: black;
   --color-action: blue;
   --color-action-bg: pink;
   --color-action-secondary: violet;
-  --color-bg: #fff;
-  --color-dim: #ccc;
+  --color-dim: lightgray;
+  --color-bg: white;
 }
 
 .dark-mode {
-  --color-primary: #fff;
+  --color-primary: white;
   --color-action: violet;
   --color-action-bg: darkslateblue;
   --color-action-secondary: deepskyblue;
-  --color-bg: #000;
-  --color-dim: #444;
+  --color-dim: gray;
+  --color-bg: black;
 }

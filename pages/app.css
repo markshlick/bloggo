@@ -10,11 +10,11 @@ body,
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  border-radius: 3px;
   outline-color: var(--color-action-secondary);
 }
 
 body {
+  font-size: 1em;
   font-family: system-ui, sans-serif;
   color: var(--color-primary);
   background-color: var(--color-bg);
@@ -29,11 +29,13 @@ a {
 }
 
 a:active {
+  border-radius: 3px;
   background-color: var(--color-action-secondary);
 }
 
 @media (hover: hover) {
   a:hover {
+    border-radius: 3px;
     background-color: var(--color-action-bg);
   }
 }
@@ -60,10 +62,6 @@ pre {
   margin-bottom: 16px;
 }
 
-button {
-  cursor: pointer;
-}
-
 button,
 input {
   font-size: inherit;
@@ -87,9 +85,18 @@ input {
 }
 
 button {
+  cursor: pointer;
   font-weight: 900;
   border: none;
   padding: 8px;
+}
+
+code {
+  color: var(--color-bg);
+  background-color: var(--color-primary);
+  font-size: 16px !important;
+  padding: 2px;
+  border-radius: 3px;
 }
 
 .container {

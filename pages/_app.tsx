@@ -21,6 +21,7 @@ import {
   Auth0Provider,
   useAuth0,
 } from 'components/AuthProvider';
+import { useDarkMode } from 'helpers/darkModeKit';
 
 const auth0InitOptions = {
   client_id: process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID!,
@@ -77,17 +78,9 @@ export default function App(props: AppProps) {
   // @ts-ignore
   const noHeader = Component.layout === 'none';
 
-  const [darkMode, setDarkMode] = useState(false);
-
-  useEffect(() => {
-    if (darkMode) {
-      document.body.classList.add('dark-mode');
-    } else {
-      document.body.classList.remove('dark-mode');
-    }
-  }, [darkMode]);
-
   useAnalytics();
+
+  const { darkMode, setDarkMode } = useDarkMode();
 
   return (
     <AppContextProviders>

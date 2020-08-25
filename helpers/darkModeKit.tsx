@@ -5,31 +5,26 @@ export function getInitialColorMode() {
     'colorMode',
   );
 
-  const hasPersistedPreference =
-    typeof persistedColorPreference === 'string';
-  // If the user has explicitly chosen light or dark,
-  // let's use it. Otherwise, this value will be null.
-  // If they haven't been explicit, let's check the media
-  // query
-
-  if (hasPersistedPreference) {
+  if (persistedColorPreference) {
     return persistedColorPreference;
   }
 
-  const mql = window.matchMedia(
+  const mq = window.matchMedia(
     '(prefers-color-scheme: dark)',
-  );
+  ).matches;
 
-  return mql.matches === true ? 'dark' : 'light';
+  return mq ? 'dark' : 'light';
 }
 
-const prefersDarkMode =
+const prefersDarkMode_cached =
   typeof window !== 'undefined'
     ? getInitialColorMode() === 'dark'
     : false;
 
 export const useDarkMode = () => {
-  const [darkMode, setDarkMode] = useState(prefersDarkMode);
+  const [darkMode, setDarkMode] = useState(
+    prefersDarkMode_cached,
+  );
 
   useEffect(() => {
     if (darkMode) {
@@ -44,10 +39,10 @@ export const useDarkMode = () => {
   return { darkMode, setDarkMode };
 };
 
-export function setInitialColorMode() {
-  const mq =
-    window.matchMedia('(prefers-color-scheme: dark)')
-      .matches === true;
+export function setInitialColorMode_toString() {
+  const mq = window.matchMedia(
+    '(prefers-color-scheme: dark)',
+  ).matches;
 
   let prefersDark = mq;
 
@@ -64,11 +59,16 @@ export function setInitialColorMode() {
   }
 }
 
+const __dangerousIife = (fn: Function) =>
+  `(${fn.toString()})()`;
+
 export const DarkMode = () => {
   return (
     <script
       dangerouslySetInnerHTML={{
-        __html: `(${setInitialColorMode.toString()})()`,
+        __html: __dangerousIife(
+          setInitialColorMode_toString,
+        ),
       }}
     ></script>
   );

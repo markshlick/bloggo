@@ -36,7 +36,7 @@ export default function Home({
           ))}
         </div>
       </Section>
-
+      {/* 
       <Section>
         <h2>/notes/</h2>
         <div>
@@ -50,7 +50,7 @@ export default function Home({
             </Space>
           ))}
         </div>
-      </Section>
+      </Section> */}
     </>
   );
 }

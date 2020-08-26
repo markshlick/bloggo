@@ -4,22 +4,21 @@ import { Section, Space } from 'components/ui';
 import Pages from 'config/Pages';
 import { getPostsIndex, Post } from 'helpers/blogPosts';
 
-export const getStaticProps: GetStaticProps = async () => {
+type HomeProps = {
+  posts: Post[];
+  // notes: Post[];
+};
+
+export const getStaticProps: GetStaticProps<HomeProps> = async () => {
   const posts = await getPostsIndex('blog');
-  const notes = await getPostsIndex('notes');
+  // const notes = await getPostsIndex('notes');
 
   return {
-    props: { posts, notes },
+    props: { posts },
   };
 };
 
-export default function Home({
-  posts,
-  notes,
-}: {
-  posts: Post[];
-  notes: Post[];
-}) {
+export default function Home({ posts }: HomeProps) {
   return (
     <>
       <Section>

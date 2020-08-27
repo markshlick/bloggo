@@ -47,6 +47,12 @@ class MyDocument extends Document {
           />
           <meta name="HandheldFriendly" content="true" />
           <meta charSet="UTF-8" />
+          <script
+            async
+            defer
+            data-domain="mksh.io"
+            src="https://plausible.io/js/plausible.js"
+          ></script>
         </Head>
         <body>
           <DarkMode />

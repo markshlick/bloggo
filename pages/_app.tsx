@@ -1,7 +1,6 @@
 import './app.css';
 import './theme.css';
 import './code.css';
-import { useEffect, useState } from 'react';
 import {
   PageContainer,
   Section,
@@ -15,44 +14,10 @@ import { AppProps } from 'next/app';
 import Pages from 'config/Pages';
 import Link from 'components/Link';
 
-import { title, fathomSiteId, moji } from 'config/site';
+import { title, moji } from 'config/site';
 import Head from 'next/head';
-import {
-  Auth0Provider,
-  useAuth0,
-} from 'components/AuthProvider';
+
 import { useDarkMode } from 'helpers/darkModeKit';
-
-const auth0InitOptions = {
-  client_id: process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID!,
-  domain: process.env.NEXT_PUBLIC_AUTH0_DOMAIN!,
-  redirect_uri: 'http://localhost:3000/',
-};
-
-const AppContextProviders = ({
-  children,
-}: React.PropsWithChildren<{}>) => (
-  <Auth0Provider initOptions={auth0InitOptions}>
-    {children}
-  </Auth0Provider>
-);
-
-const useAnalytics = () => {
-  useEffect(() => {
-    let tracker = window.document.createElement('script');
-    let firstScript = window.document.getElementsByTagName(
-      'script',
-    )[0];
-    tracker.defer = true;
-    tracker.setAttribute('site', fathomSiteId);
-    tracker.setAttribute('spa', 'auto');
-    tracker.src = 'https://cdn.usefathom.com/script.js';
-    firstScript.parentNode?.insertBefore(
-      tracker,
-      firstScript,
-    );
-  }, []);
-};
 
 const Ribbon = () => (
   <>
@@ -78,12 +43,10 @@ export default function App(props: AppProps) {
   // @ts-ignore
   const noHeader = Component.layout === 'none';
 
-  useAnalytics();
-
   const { darkMode, setDarkMode } = useDarkMode();
 
   return (
-    <AppContextProviders>
+    <>
       <Ribbon />
       {noHeader ? (
         <Component {...pageProps} />
@@ -101,7 +64,7 @@ export default function App(props: AppProps) {
           </PageContainer>
         </>
       )}
-    </AppContextProviders>
+    </>
   );
 }
 

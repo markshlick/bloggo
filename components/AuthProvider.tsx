@@ -1,8 +1,25 @@
-import React, { useState, useEffect, useContext } from 'react';
-import createAuth0Client, { Auth0ClientOptions, Auth0Client } from '@auth0/auth0-spa-js';
+import React, {
+  useState,
+  useEffect,
+  useContext,
+} from 'react';
+import createAuth0Client, {
+  Auth0ClientOptions,
+  Auth0Client,
+} from '@auth0/auth0-spa-js';
+
+const auth0InitOptions = {
+  client_id: process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID!,
+  domain: process.env.NEXT_PUBLIC_AUTH0_DOMAIN!,
+  redirect_uri: 'http://localhost:3000/',
+};
 
 const defaultRedirectCallback = () =>
-  window.history.replaceState({}, document.title, window.location.pathname);
+  window.history.replaceState(
+    {},
+    document.title,
+    window.location.pathname,
+  );
 
 export const Auth0Context = React.createContext<{
   isAuthenticated: boolean;
@@ -30,7 +47,9 @@ export const Auth0Provider = ({
   onRedirectCallback?: (state: any) => void;
   initOptions: Auth0ClientOptions;
 }>) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<
+    boolean
+  >(false);
   const [user, setUser] = useState();
   const [auth0Client, setAuth0] = useState<Auth0Client>();
   const [loading, setLoading] = useState(true);
@@ -38,10 +57,15 @@ export const Auth0Provider = ({
 
   useEffect(() => {
     const initAuth0 = async () => {
-      const auth0FromHook = await createAuth0Client(initOptions);
+      const auth0FromHook = await createAuth0Client(
+        initOptions,
+      );
       setAuth0(auth0FromHook);
 
-      if (window.location.search.includes('code=') && window.location.search.includes('state=')) {
+      if (
+        window.location.search.includes('code=') &&
+        window.location.search.includes('state=')
+      ) {
         const redirectLoginResult = await auth0FromHook.handleRedirectCallback();
         onRedirectCallback(redirectLoginResult.appState);
       }

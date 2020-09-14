@@ -41,13 +41,12 @@ const Ribbon = () => (
 export default function App(props: AppProps) {
   const { Component, pageProps } = props;
   // @ts-ignore
-  const noHeader = Component.layout === 'none';
+  const noHeader = Component.layout === null;
 
   const { darkMode, setDarkMode } = useDarkMode();
 
   return (
     <>
-      <Ribbon />
       {noHeader ? (
         <Component {...pageProps} />
       ) : (
@@ -55,6 +54,7 @@ export default function App(props: AppProps) {
           <Head>
             <title>{title}</title>
           </Head>
+          <Ribbon />
           <PageContainer>
             <Header
               darkMode={darkMode}

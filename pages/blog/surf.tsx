@@ -119,6 +119,7 @@ const Post = () => {
   );
 };
 
-Post.layout = 'none';
+// @ts-ignore
+Post.layout = null;
 
 export default Post;

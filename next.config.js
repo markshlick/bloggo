@@ -1,6 +1,7 @@
 // @ts-check
 
 const withMdx = require('@next/mdx');
+const withCSS = require('@zeit/next-css');
 const rehypePrism = require('@mapbox/rehype-prism');
 
 const rssFeedFilePath = './scripts/rss.ts';
@@ -27,7 +28,15 @@ function withRss(nextConf) {
   };
 }
 
-const pageExts = ['js', 'jsx', 'ts', 'tsx', 'md', 'mdx'];
+const pageExts = [
+  'js',
+  'jsx',
+  'ts',
+  'tsx',
+  'md',
+  'mdx',
+  'css',
+];
 
 const withMdxOpts = {
   extension: /\.(md|mdx)$/,
@@ -43,4 +52,6 @@ function config() {
   };
 }
 
-module.exports = withMdx(withMdxOpts)(withRss(config()));
+module.exports = withCSS(
+  withMdx(withMdxOpts)(withRss(config())),
+);

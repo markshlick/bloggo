@@ -29,10 +29,6 @@ class MyDocument extends Document {
             type="application/rss+xml"
             href={rssFeedPath}
           />
-          <link
-            rel="stylesheet"
-            href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;900&display=swap"
-          />
           <meta
             name="apple-mobile-web-app-capable"
             content="yes"

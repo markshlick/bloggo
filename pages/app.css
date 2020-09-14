@@ -88,10 +88,12 @@ input {
 }
 
 button {
+  color: var(--color-bg);
+  background-color: var(--color-action);
   cursor: pointer;
   font-weight: 900;
   border: none;
-  padding: 8px;
+  padding: 8px 24px;
 }
 
 code {
@@ -122,6 +124,10 @@ code {
 
 .space-inline {
   margin-right: 16px;
+}
+
+.space-inline-small {
+  margin-right: 8px;
 }
 
 .box {

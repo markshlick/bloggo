@@ -1,6 +1,5 @@
-import './app.css';
-import './theme.css';
-import './code.css';
+import 'styles/app.css';
+import 'styles/code.css';
 import {
   PageContainer,
   Section,
@@ -10,6 +9,7 @@ import {
   SpaceInline,
   ButtonUnstyled,
 } from 'components/ui';
+import 'styles/theme.css';
 import { AppProps } from 'next/app';
 import Pages from 'config/Pages';
 import Link from 'components/Link';

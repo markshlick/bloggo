@@ -1,4 +1,4 @@
-import './styles.css';
+import 'styles/utility-ui.css';
 
 export default function Exploration() {
   return (

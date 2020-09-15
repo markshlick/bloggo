@@ -20,7 +20,6 @@ import {
   isDate,
 } from 'util';
 import { SetValue } from 'metaes/environment';
-import { table } from 'console';
 
 const CodeEditor = dynamic(
   import('components/CodeEditor'),

@@ -343,7 +343,7 @@ export default function Meta() {
       code,
       endExec,
       (err) => {
-        alert(err);
+        alert(JSON.stringify(err));
         endExec();
       },
       globalObjs,

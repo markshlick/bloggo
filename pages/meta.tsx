@@ -1,3 +1,6 @@
+import { useRef, useState } from 'react';
+
+import { metaesEval } from 'metaes';
 import {
   Continuation,
   ErrorContinuation,
@@ -5,112 +8,277 @@ import {
   EvaluationConfig,
   Evaluation,
 } from 'metaes/types';
-
-import dynamic from 'next/dynamic';
-
-import { TextMarker, Editor } from 'codemirror';
+import { JavaScriptASTNode } from 'metaes/nodeTypes';
 import { ECMAScriptInterpreters } from 'metaes/interpreters';
 
-import { useRef, useState } from 'react';
-import { metaesEval } from 'metaes';
+import dynamic from 'next/dynamic';
+import { TextMarker, Editor } from 'codemirror';
+import {
+  isFunction,
+  isObject,
+  isString,
+  isDate,
+} from 'util';
+import { SetValue } from 'metaes/environment';
+import { table } from 'console';
 
-const CodeEditor = dynamic(import('components/Editor'), {
-  ssr: false,
-});
+const CodeEditor = dynamic(
+  import('components/CodeEditor'),
+  {
+    ssr: false,
+  },
+);
 
 const Tree = dynamic(import('react-d3-tree'), {
   ssr: false,
 });
 
-const timeout = 100;
+function formatValue(arg: any) {
+  if (isFunction(arg)) {
+    return `fn()`;
+  } else if (isObject(arg)) {
+    return `${
+      arg.constructor.name === 'Object'
+        ? ''
+        : arg.constructor.name
+    }{${Object.keys(arg).join(', ')}}`;
+  } else if (isDate(arg)) {
+    return `Date{${arg.toISOString()}}`;
+  } else if (isString(arg)) {
+    return `"${arg}"`;
+  } else {
+    return arg;
+  }
+}
 
-const code = `function fibonacci(num) {
-  if (num <= 1) return 1;
+function formatArgs(args: any[]) {
+  return args.map((arg) => formatValue(arg)).join(', ');
+}
+
+const code = `// psst: you can edit me!
+function fibonacci(num) {
+  if (num < 0) return null;
+  if (num <= 1) return num;
 
   const f1 = fibonacci(num - 1);
   const f2 = fibonacci(num - 2);
-  const r = f1 + f2;
+  const result = f1 + f2;
 
-  return r;
+  return result;
 }
 
 fibonacci(4);
 `;
 
+const globalObjs = {
+  Number,
+  Boolean,
+  Array,
+  Object,
+  Function,
+  String,
+  RegExp,
+  Date,
+  BigInt,
+  Math,
+  Map,
+  Set,
+  WeakMap,
+  WeakSet,
+  Error,
+  parseInt,
+  parseFloat,
+  isNaN,
+  JSON,
+};
+
 type NodeNames = keyof typeof ECMAScriptInterpreters.values;
 
 const interestingTypes: NodeNames[] = [
+  'BlockStatement',
   'ReturnStatement',
-  'IfStatement',
   'AssignmentPattern',
   'AssignmentExpression',
   'VariableDeclaration',
   'CallExpression',
   'ExpressionStatement',
+  'IfStatement',
+  'ForStatement',
+  'ForInStatement',
+  'ForOfStatement',
+  'WhileStatement',
+  'ConditionalExpression',
 ];
 
-type StackNode = {
-  id: number;
+type StackFrame = {
+  id: string;
   name: string;
-  // evaluation: Evaluation;
+  fnName: string;
   args: any[];
   values: {
     [key: string]: any;
   };
   returnValue: any;
-  children: StackNode[];
+  children: StackFrame[];
+  hasReturned: boolean;
+};
+
+type WatchValues = Record<
+  string,
+  { frame: StackFrame; value: any }[]
+>;
+
+const GraphNode = ({
+  nodeData,
+}: {
+  nodeData?: StackFrame;
+}) => {
+  return (
+    <div>
+      {nodeData ? (
+        <strong>
+          {nodeData?.fnName}({formatArgs(nodeData?.args)})
+          {/* {' => '}
+        {nodeData?.hasReturned
+          ? nodeData?.returnValue
+          : '...'} */}
+        </strong>
+      ) : null}
+    </div>
+  );
 };
 
 export default function Meta() {
+  const [, forceUpdate] = useState();
+  const update = () => forceUpdate({});
   const [stackState, setStackState] = useState<{
-    callsRoot: StackNode[];
-    stack: StackNode[];
-    allNodes: StackNode[];
-  }>({ stack: [], callsRoot: [], allNodes: [] });
-  const editorRef = useRef<Editor>();
-  const metaRef = useRef<{ running: boolean }>({
-    running: false,
+    currentEvaluation?: Evaluation;
+    callsRoot: StackFrame[];
+    stack: StackFrame[];
+    allNodes: StackFrame[];
+    watchValues: WatchValues;
+  }>({
+    stack: [],
+    callsRoot: [],
+    allNodes: [],
+    watchValues: {},
   });
 
-  const run = () => {
-    const editor = editorRef.current;
-    if (!editor || metaRef.current.running) {
+  console.log(stackState);
+
+  const editorRef = useRef<Editor>();
+
+  const execStateRef = useRef<{
+    autoStepping: boolean;
+    running: boolean;
+    speed: number;
+    marker?: TextMarker;
+    timer?: NodeJS.Timeout;
+    next?: () => any;
+  }>({
+    autoStepping: false,
+    running: false,
+    speed: 400,
+    marker: undefined,
+    next: undefined,
+    timer: undefined,
+  });
+
+  const markEditor = (e: Evaluation) => {
+    if (!e.e.loc) return;
+
+    const start = {
+      ch: e.e.loc.start.column,
+      line: e.e.loc.start.line - 1,
+    };
+
+    const end = {
+      ch: e.e.loc.end.column,
+      line: e.e.loc.end.line - 1,
+    };
+
+    execStateRef.current.marker?.clear();
+
+    editorRef.current?.setCursor(start, 20);
+
+    execStateRef.current.marker = editorRef.current?.markText(
+      start,
+      end,
+      {
+        css: 'background-color: rgba(230, 10, 100, 0.5);',
+      },
+    );
+  };
+
+  const endExec = () => {
+    execStateRef.current.autoStepping = false;
+    execStateRef.current.running = false;
+    execStateRef.current.next = undefined;
+    execStateRef.current.marker?.clear();
+    execStateRef.current.timer &&
+      clearTimeout(execStateRef.current.timer);
+
+    update();
+  };
+
+  const startExec = () => {
+    if (
+      !editorRef.current ||
+      execStateRef.current.running
+    ) {
       return;
     }
-    let marker: TextMarker;
-    const code = editor.getDoc().getValue();
 
-    let callsRoot: StackNode[] = [];
-    let allNodes: StackNode[] = [];
-    let callStack: StackNode[] = [];
+    execStateRef.current.running = true;
 
-    const recordStack = (e: Evaluation) => {
-      if (e.e.type === 'Apply') {
+    const code = editorRef.current.getDoc().getValue();
+
+    let callsRoot: StackFrame[] = [];
+    let allStackNodes: StackFrame[] = [];
+    let callStack: StackFrame[] = [];
+
+    let watchValues: WatchValues = {};
+
+    setStackState({
+      stack: [],
+      callsRoot: [],
+      allNodes: [],
+      watchValues,
+    });
+
+    const updateStackState = (e: Evaluation) => {
+      const fnName = e.e?.e?.callee.name;
+      if (fnName && e.e.type === 'Apply') {
         if (e.phase === 'enter') {
-          const fnName = e.e.e.callee.name;
-          const r: StackNode = {
-            name: `${fnName}(${e.e.args.join()})`,
+          const id = `${allStackNodes.length}`;
+          const frame: StackFrame = {
+            fnName,
             args: e.e.args,
-            id: allNodes.length,
+            id,
+            name: id,
             children: [],
             values: {},
+            hasReturned: false,
             returnValue: undefined,
           };
 
           (callStack.length
             ? callStack[callStack.length - 1].children
             : callsRoot
-          ).push(r);
-          callStack.push(r);
-          allNodes.push(r);
+          ).push(frame);
+
+          callStack.push(frame);
+          allStackNodes.push(frame);
         } else {
           if (callStack.length) {
-            callStack[callStack.length - 1].name += ` => ${
-              e.value || 'void'
-            }`;
+            callStack[
+              callStack.length - 1
+            ].hasReturned = true;
+
             callStack[callStack.length - 1].returnValue =
               e.value;
           }
+
           callStack.pop();
         }
       } else {
@@ -121,62 +289,54 @@ export default function Meta() {
       }
 
       setStackState({
+        currentEvaluation: e,
         callsRoot,
-        allNodes,
+        allNodes: allStackNodes,
         stack: callStack,
+        watchValues,
       });
-    };
-
-    const markEditor = (e: Evaluation) => {
-      if (!e.e.loc) return;
-
-      const start = {
-        ch: e.e.loc.start.column,
-        line: e.e.loc.start.line - 1,
-      };
-
-      const end = {
-        ch: e.e.loc.end.column,
-        line: e.e.loc.end.line - 1,
-      };
-
-      marker?.clear();
-
-      marker = editor.markText(start, end, {
-        css: 'background-color: rgba(230, 10, 100, 0.5);',
-      });
-    };
-
-    metaRef.current.running = true;
-    const done = () => {
-      marker?.clear();
-      setStackState({ stack: [], callsRoot, allNodes });
-      metaRef.current.running = false;
-    };
-
-    const showNode = (name: NodeNames) => (
-      e: unknown,
-      c: Continuation,
-      cerr: ErrorContinuation,
-      env: Environment,
-      config: EvaluationConfig,
-    ) => {
-      const next = () => {
-        const f = ECMAScriptInterpreters.values[
-          name
-        ] as any;
-
-        f(e, c, cerr, env, config);
-      };
-
-      setTimeout(next, timeout);
     };
 
     const makeNodeHandlers = (names: NodeNames[]) => {
       const map: Partial<{ [name in NodeNames]: any }> = {};
 
       for (const name of names) {
-        map[name] = showNode(name);
+        map[name] = (
+          e: JavaScriptASTNode,
+          c: Continuation,
+          cerr: ErrorContinuation,
+          env: Environment,
+          config: EvaluationConfig,
+        ) => {
+          const next = () => {
+            const f = ECMAScriptInterpreters.values[
+              name
+            ] as any;
+
+            f(e, c, cerr, env, config);
+          };
+
+          // HACK: Program statements (not interesting) are handled as BlockStatements by the interpreter
+          if (e.type === 'Program') {
+            next();
+            return;
+          }
+
+          if (execStateRef.current.autoStepping) {
+            const run = () => {
+              if (execStateRef.current.autoStepping) {
+                next();
+              }
+            };
+
+            execStateRef.current.timer = setTimeout(
+              run,
+              execStateRef.current.speed,
+            );
+          }
+
+          execStateRef.current.next = next;
+        };
       }
 
       return map;
@@ -184,16 +344,41 @@ export default function Meta() {
 
     metaesEval(
       code,
-      done,
-      done,
-      {},
+      endExec,
+      (err) => {
+        console.error(err);
+        endExec();
+      },
+      globalObjs,
       {
         interpreters: {
           prev: ECMAScriptInterpreters,
-          values: makeNodeHandlers(interestingTypes),
+          values: {
+            ...makeNodeHandlers(interestingTypes),
+            SetValue(
+              e: {
+                name: string;
+                value: any;
+                isDeclaration: boolean;
+              },
+              c: Continuation,
+              cerr: ErrorContinuation,
+              env: Environment,
+            ) {
+              const frame = callStack[callStack.length - 1];
+              const k = `${frame?.fnName ?? ''}:${e.name}`;
+              watchValues[k] = watchValues[k] ?? [];
+              watchValues[k].push({
+                frame,
+                value: e.value,
+              });
+
+              SetValue(e, c, cerr, env);
+            },
+          },
         },
         interceptor(e) {
-          recordStack(e);
+          updateStackState(e);
 
           if (interestingTypes.includes(e.e.type)) {
             markEditor(e);
@@ -203,109 +388,296 @@ export default function Meta() {
     );
   };
 
-  return (
-    <div
-      style={{
-        minHeight: 600,
-        boxSizing: 'border-box',
-        padding: 30,
-        display: 'grid',
-        gridTemplateRows: '1fr 1fr',
-        gridGap: 30,
-      }}
-    >
+  const handleStep = () => {
+    if (!execStateRef.current.running) {
+      startExec();
+    } else if (execStateRef.current.next) {
+      execStateRef.current.next();
+    } else {
+      endExec();
+    }
+    update();
+  };
+
+  const handleAutoStep = () => {
+    execStateRef.current.autoStepping = true;
+    if (!execStateRef.current.running) {
+      startExec();
+    } else if (execStateRef.current.next) {
+      execStateRef.current.next();
+    }
+
+    update();
+  };
+
+  const handleAutoStepPause = () => {
+    execStateRef.current.autoStepping = false;
+    update();
+  };
+
+  const handleRestart = () => {
+    const autoStepping = execStateRef.current.autoStepping;
+    endExec();
+    execStateRef.current.autoStepping = autoStepping;
+    startExec();
+    update();
+  };
+
+  const handleExit = () => {
+    if (execStateRef.current.running) {
+      endExec();
+      update();
+    }
+  };
+
+  const callGraphEl = (
+    <div key="graph">
+      <h2>The Call Graph</h2>
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gridGap: 30,
-        }}
-      >
-        <div>
-          <div className="space-small">
-            <CodeEditor
-              editorDidMount={(editor) =>
-                (editorRef.current = editor)
-              }
-              value={code}
-              options={{}}
-            />
-          </div>
-          {/* <button onClick={run}>Step</button>{' '} */}
-          <button onClick={run}>Run</button>{' '}
-          {/* <button onClick={run}>Pause</button>{' '} */}
-        </div>
-        <div style={{ position: 'relative' }}>
-          {stackState.stack.map(({ name, values }, i) => {
-            const {
-              arguments: _arguments,
-              this: _this,
-              ...rest
-            } = values ?? {};
-
-            const offset = stackState.stack.length - i - 1;
-
-            return (
-              <div
-                key={i}
-                style={{
-                  position: 'absolute',
-                  transition: `transform ${timeout}ms`,
-                  transformOrigin: 'top',
-                  transform: `translateY(${i * 10}px)
-                    scale(${Math.max(
-                      0.2,
-                      1 - offset * 0.1,
-                    )})`,
-                  background: `linear-gradient(
-                      -45deg,
-                      rgba(255,255,255,0.7),
-                      rgba(230,230,240,0.7)
-                    )`,
-                  width: '100%',
-                  height: 300,
-                  padding: 30,
-                  borderRadius: 8,
-                  backdropFilter: 'blur(10px)',
-                  boxShadow: '0px 0px 15px #55555544',
-                }}
-              >
-                <h3>{name}</h3>
-                {Object.entries(rest).map(([key, val]) => {
-                  return (
-                    <div key={key}>
-                      <strong>{key}:</strong>{' '}
-                      {JSON.stringify(val)}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      <div
-        style={{
-          height: '100%',
-          width: '100%',
+          height: '300px',
           border: '1px lightgray solid',
-          borderRadius: 8,
+          borderRadius: 4,
         }}
       >
         {stackState.callsRoot.length ? (
           <Tree
-            translate={{ x: 200, y: 60 }}
-            orientation={'vertical'}
-            collapsible={false}
+            translate={{ x: 100, y: 100 }}
+            zoom={0.5}
+            orientation="vertical"
             transitionDuration={0}
-            zoom={0.6}
-            separation={{ siblings: 2, nonSiblings: 2 }}
             data={[...stackState.callsRoot]}
+            allowForeignObjects
+            nodeLabelComponent={{
+              foreignObjectWrapper: {
+                y: 24,
+              },
+              render: <GraphNode />,
+            }}
           />
         ) : null}
       </div>
     </div>
   );
+
+  const fibVals: number[] = [];
+  for (const x of stackState.allNodes) {
+    fibVals[x.args[0]] =
+      fibVals[x.args[0]] ?? x.returnValue;
+  }
+
+  const filledArr = Array(fibVals.length).fill(null);
+
+  const valueTable = (
+    <div key="table" className="space">
+      <h2>Fibonacci values</h2>
+      <div
+        style={{
+          overflow: 'scroll',
+          border: '1px lightgray solid',
+          borderRadius: 4,
+          padding: 12,
+        }}
+      >
+        <table>
+          <tr>
+            <th
+              scope="row"
+              align="left"
+              style={{ padding: 4 }}
+            >
+              Number
+            </th>
+            {filledArr.map((n, i) => (
+              <td key={i} style={{ padding: 4 }}>
+                {i}
+              </td>
+            ))}
+          </tr>
+          <tr>
+            <th
+              scope="row"
+              align="left"
+              style={{ padding: 4 }}
+            >
+              Fibonacci
+            </th>
+            {filledArr.map((n, i) => (
+              <td key={i} style={{ padding: 4 }}>
+                {fibVals[i]}
+              </td>
+            ))}
+          </tr>
+        </table>
+      </div>
+    </div>
+  );
+
+  const callStackEl = (
+    <div key="stack">
+      <h2>The Stack</h2>
+      <div
+        style={{
+          height: '300px',
+          overflow: 'scroll',
+          border: '1px lightgray solid',
+          borderRadius: 4,
+          padding: 12,
+        }}
+      >
+        {[...stackState.stack]
+          .reverse()
+          .map(
+            (
+              {
+                id,
+                fnName,
+                args,
+                values,
+                returnValue,
+                hasReturned,
+              },
+              i,
+            ) => {
+              const {
+                this: _1,
+                arguments: _2,
+                ...restValues
+              } = values;
+              return (
+                <div
+                  key={id}
+                  className="space-small"
+                  style={{
+                    border: '1px lightgray solid',
+                    borderRadius: 4,
+                    padding: 12,
+                  }}
+                >
+                  <h4 className="no-space">
+                    [{stackState.stack.length - i}]{' '}
+                    <em>
+                      {fnName}({formatArgs(args)})
+                    </em>
+                  </h4>
+                  <div style={{ marginLeft: 12 }}>
+                    {Object.entries(restValues).map(
+                      ([name, value]) => (
+                        <div key={name}>
+                          <small>
+                            <strong>{name} = </strong>
+                            <em>{formatValue(value)}</em>
+                          </small>
+                        </div>
+                      ),
+                    )}
+                    {hasReturned && (
+                      <div key="return">
+                        <small>
+                          <strong>{'<='} </strong>
+                          <em>
+                            {formatValue(returnValue)}
+                          </em>
+                        </small>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            },
+          )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ margin: '0 auto', maxWidth: 840 }}>
+      <h1>Ch 1: The Fibonacci Sequence</h1>
+      <div key="editor" className="space">
+        <div
+          style={{ height: '30vh', minHeight: 320 }}
+          className="space-small"
+        >
+          <CodeEditor
+            editorDidMount={(editor) =>
+              (editorRef.current = editor)
+            }
+            value={code}
+            options={{
+              readOnly: execStateRef.current.running,
+              lineNumbers: true,
+            }}
+          />
+        </div>
+        <div className="space-small">
+          <button
+            className="small"
+            disabled={execStateRef.current.autoStepping}
+            onClick={handleStep}
+          >
+            Step
+          </button>
+          {' | '}
+          <button
+            className="small"
+            disabled={execStateRef.current.autoStepping}
+            onClick={handleAutoStep}
+          >
+            Auto-step
+          </button>{' '}
+          <button
+            className="small"
+            disabled={!execStateRef.current.autoStepping}
+            onClick={handleAutoStepPause}
+          >
+            Pause
+          </button>
+          {' | '}
+          <button
+            className="small"
+            disabled={!execStateRef.current.running}
+            onClick={handleRestart}
+          >
+            Restart
+          </button>{' '}
+          <button
+            className="small"
+            disabled={!execStateRef.current.running}
+            onClick={handleExit}
+          >
+            Exit
+          </button>
+        </div>
+        <div>
+          <label>Playback speed</label>{' '}
+          <input
+            defaultValue={2000 - execStateRef.current.speed}
+            type="range"
+            min="0"
+            max="2000"
+            onChange={(e) => {
+              execStateRef.current.speed =
+                2100 - parseInt(e.target.value);
+            }}
+          />
+        </div>
+      </div>
+      <div>{valueTable}</div>
+      <div
+        key="data"
+        className="space"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gridGap: '20px',
+        }}
+      >
+        {callStackEl}
+        {callGraphEl}
+      </div>
+    </div>
+  );
 }
+
 // @ts-ignore
 Meta.layout = null;

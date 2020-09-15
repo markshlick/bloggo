@@ -87,6 +87,10 @@ input {
   padding: 8px;
 }
 
+input[type='range'] {
+  padding: 0px;
+}
+
 button {
   color: var(--color-bg);
   background-color: var(--color-action);
@@ -94,6 +98,14 @@ button {
   font-weight: 900;
   border: none;
   padding: 8px 24px;
+}
+
+button.small {
+  padding: 4px 12px;
+}
+
+button:disabled {
+  background-color: var(--color-dim);
 }
 
 code {
@@ -112,6 +124,10 @@ code {
 
 .section {
   margin-bottom: 16px;
+}
+
+.no-space {
+  margin-bottom: 0;
 }
 
 .space {
@@ -153,4 +169,13 @@ code {
   color: var(--color-action);
   border: none;
   background: none;
+}
+
+.code-editor {
+  height: 100%;
+}
+
+.code-editor .CodeMirror {
+  height: 100%;
+  border-radius: 3px;
 }

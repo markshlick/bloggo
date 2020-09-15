@@ -6,7 +6,7 @@ import {
 import { EditorConfiguration } from 'codemirror';
 import 'codemirror/mode/javascript/javascript';
 import 'codemirror/lib/codemirror.css';
-import 'codemirror/theme/material.css';
+import 'codemirror/theme/material-palenight.css';
 
 export default ({
   editorDidMount,
@@ -17,15 +17,14 @@ export default ({
   editorDidMount: IUnControlledCodeMirror['editorDidMount'];
   options: EditorConfiguration;
 }) => (
-  <div>
-    <CodeMirror
-      value={value}
-      editorDidMount={editorDidMount}
-      options={{
-        ...options,
-        theme: 'material',
-        mode: 'javascript',
-      }}
-    />
-  </div>
+  <CodeMirror
+    className="code-editor"
+    value={value}
+    editorDidMount={editorDidMount}
+    options={{
+      ...options,
+      theme: 'material-palenight',
+      mode: 'javascript',
+    }}
+  />
 );

@@ -163,8 +163,6 @@ export default function Meta() {
     watchValues: {},
   });
 
-  console.log(stackState);
-
   const editorRef = useRef<Editor>();
 
   const execStateRef = useRef<{
@@ -345,7 +343,7 @@ export default function Meta() {
       code,
       endExec,
       (err) => {
-        console.error(err);
+        alert(err);
         endExec();
       },
       globalObjs,

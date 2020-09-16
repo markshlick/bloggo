@@ -10,6 +10,7 @@ import {
 } from 'metaes/types';
 import { JavaScriptASTNode } from 'metaes/nodeTypes';
 import { ECMAScriptInterpreters } from 'metaes/interpreters';
+import { callcc } from 'metaes/callcc';
 
 import dynamic from 'next/dynamic';
 import { TextMarker, Editor } from 'codemirror';
@@ -78,7 +79,6 @@ const globalObjs = {
   String,
   RegExp,
   Date,
-  BigInt,
   Math,
   Map,
   Set,
@@ -89,6 +89,7 @@ const globalObjs = {
   parseFloat,
   isNaN,
   JSON,
+  console,
 };
 
 type NodeNames = keyof typeof ECMAScriptInterpreters.values;
@@ -136,7 +137,8 @@ const GraphNode = ({
     <div>
       {nodeData ? (
         <strong>
-          {nodeData?.fnName}({formatArgs(nodeData?.args)})
+          {nodeData?.fnName}(
+          {nodeData ? formatArgs(nodeData?.args) : ''})
           {/* {' => '}
         {nodeData?.hasReturned
           ? nodeData?.returnValue
@@ -170,16 +172,53 @@ export default function Meta() {
     running: boolean;
     speed: number;
     marker?: TextMarker;
-    timer?: NodeJS.Timeout;
+    nextTimer?: NodeJS.Timeout;
     next?: () => any;
+    programTimers: Set<NodeJS.Timeout>;
   }>({
     autoStepping: false,
     running: false,
     speed: 400,
     marker: undefined,
     next: undefined,
-    timer: undefined,
+    nextTimer: undefined,
+    programTimers: new Set(),
   });
+
+  const prepareMetaFunctions = () => {
+    let _setTimeoutForMain;
+
+    function _setTimeout(
+      [cb, ms]: [() => void, number],
+      c: (a: any) => void,
+      cerr: (a: any) => void,
+    ) {
+      const timer = setTimeout(() => {
+        execStateRef.current.programTimers.delete(timer);
+        try {
+          c(cb());
+        } catch (error) {
+          cerr(error);
+        }
+      }, ms);
+
+      execStateRef.current.programTimers.add(timer);
+    }
+
+    metaesEval(
+      `({ setTimeout: (cb, ms) => callcc(_setTimeout, [cb, ms]) })`,
+      ({ setTimeout }) => {
+        _setTimeoutForMain = setTimeout;
+      },
+      console.error,
+      {
+        callcc,
+        _setTimeout,
+      },
+    );
+
+    return { setTimeout: _setTimeoutForMain };
+  };
 
   const markEditor = (e: Evaluation) => {
     if (!e.e.loc) return;
@@ -208,12 +247,16 @@ export default function Meta() {
   };
 
   const endExec = () => {
+    if (execStateRef.current.programTimers.size) {
+      return;
+    }
+
     execStateRef.current.autoStepping = false;
     execStateRef.current.running = false;
     execStateRef.current.next = undefined;
     execStateRef.current.marker?.clear();
-    execStateRef.current.timer &&
-      clearTimeout(execStateRef.current.timer);
+    execStateRef.current.nextTimer &&
+      clearTimeout(execStateRef.current.nextTimer);
 
     update();
   };
@@ -312,7 +355,6 @@ export default function Meta() {
 
             f(e, c, cerr, env, config);
           };
-
           // HACK: Program statements (not interesting) are handled as BlockStatements by the interpreter
           if (e.type === 'Program') {
             next();
@@ -326,7 +368,7 @@ export default function Meta() {
               }
             };
 
-            execStateRef.current.timer = setTimeout(
+            execStateRef.current.nextTimer = setTimeout(
               run,
               execStateRef.current.speed,
             );
@@ -346,7 +388,10 @@ export default function Meta() {
         alert(JSON.stringify(err));
         endExec();
       },
-      globalObjs,
+      {
+        // ...prepareMetaFunctions(),
+        ...globalObjs,
+      },
       {
         interpreters: {
           prev: ECMAScriptInterpreters,
@@ -443,7 +488,17 @@ export default function Meta() {
             zoom={0.5}
             orientation="vertical"
             transitionDuration={0}
-            data={[...stackState.callsRoot]}
+            collapsible={false}
+            data={[
+              {
+                id: 'Program',
+                name: 'Program',
+                fnName: 'Program',
+                args: [],
+                values: {},
+                children: [...stackState.callsRoot],
+              } as any,
+            ]}
             allowForeignObjects
             nodeLabelComponent={{
               foreignObjectWrapper: {
@@ -467,7 +522,7 @@ export default function Meta() {
 
   const valueTable = (
     <div key="table" className="space">
-      <h2>Fibonacci values</h2>
+      <h2>Values</h2>
       <div
         style={{
           overflow: 'scroll',
@@ -477,34 +532,36 @@ export default function Meta() {
         }}
       >
         <table>
-          <tr>
-            <th
-              scope="row"
-              align="left"
-              style={{ padding: 4 }}
-            >
-              Number
-            </th>
-            {filledArr.map((n, i) => (
-              <td key={i} style={{ padding: 4 }}>
-                {i}
-              </td>
-            ))}
-          </tr>
-          <tr>
-            <th
-              scope="row"
-              align="left"
-              style={{ padding: 4 }}
-            >
-              Fibonacci
-            </th>
-            {filledArr.map((n, i) => (
-              <td key={i} style={{ padding: 4 }}>
-                {fibVals[i]}
-              </td>
-            ))}
-          </tr>
+          <tbody>
+            <tr>
+              <th
+                scope="row"
+                align="left"
+                style={{ padding: 4 }}
+              >
+                Index
+              </th>
+              {filledArr.map((n, i) => (
+                <td key={i} style={{ padding: 4 }}>
+                  {i}
+                </td>
+              ))}
+            </tr>
+            <tr>
+              <th
+                scope="row"
+                align="left"
+                style={{ padding: 4 }}
+              >
+                Fibonacci
+              </th>
+              {filledArr.map((n, i) => (
+                <td key={i} style={{ padding: 4 }}>
+                  {fibVals[i]}
+                </td>
+              ))}
+            </tr>
+          </tbody>
         </table>
       </div>
     </div>

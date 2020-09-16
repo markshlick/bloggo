@@ -10,7 +10,9 @@ import {
 } from 'metaes/types';
 import { JavaScriptASTNode } from 'metaes/nodeTypes';
 import { ECMAScriptInterpreters } from 'metaes/interpreters';
-import { callcc } from 'metaes/callcc';
+import { SetValue } from 'metaes/environment';
+import { getMetaFunction } from 'metaes/metafunction';
+import { evaluate } from 'metaes/evaluate';
 
 import dynamic from 'next/dynamic';
 import { TextMarker, Editor } from 'codemirror';
@@ -20,7 +22,6 @@ import {
   isString,
   isDate,
 } from 'util';
-import { SetValue } from 'metaes/environment';
 
 const CodeEditor = dynamic(
   import('components/CodeEditor'),
@@ -32,6 +33,8 @@ const CodeEditor = dynamic(
 const Tree = dynamic(import('react-d3-tree'), {
   ssr: false,
 });
+
+type SetTimeout = (fn: () => void, ms: number) => number;
 
 function formatValue(arg: any) {
   if (isFunction(arg)) {
@@ -172,9 +175,10 @@ export default function Meta() {
     running: boolean;
     speed: number;
     marker?: TextMarker;
-    nextTimer?: NodeJS.Timeout;
+    nextTimer?: number;
     next?: () => any;
-    programTimers: Set<NodeJS.Timeout>;
+    programTimers: Set<number>;
+    programIntervals: Set<number>;
   }>({
     autoStepping: false,
     running: false,
@@ -183,42 +187,8 @@ export default function Meta() {
     next: undefined,
     nextTimer: undefined,
     programTimers: new Set(),
+    programIntervals: new Set(),
   });
-
-  const prepareMetaFunctions = () => {
-    let _setTimeoutForMain;
-
-    function _setTimeout(
-      [cb, ms]: [() => void, number],
-      c: (a: any) => void,
-      cerr: (a: any) => void,
-    ) {
-      const timer = setTimeout(() => {
-        execStateRef.current.programTimers.delete(timer);
-        try {
-          c(cb());
-        } catch (error) {
-          cerr(error);
-        }
-      }, ms);
-
-      execStateRef.current.programTimers.add(timer);
-    }
-
-    metaesEval(
-      `({ setTimeout: (cb, ms) => callcc(_setTimeout, [cb, ms]) })`,
-      ({ setTimeout }) => {
-        _setTimeoutForMain = setTimeout;
-      },
-      console.error,
-      {
-        callcc,
-        _setTimeout,
-      },
-    );
-
-    return { setTimeout: _setTimeoutForMain };
-  };
 
   const markEditor = (e: Evaluation) => {
     if (!e.e.loc) return;
@@ -246,19 +216,45 @@ export default function Meta() {
     );
   };
 
-  const endExec = () => {
-    if (execStateRef.current.programTimers.size) {
-      return;
+  const maybeEndExec = () => {
+    if (
+      !execStateRef.current.programTimers.size &&
+      !execStateRef.current.programIntervals.size &&
+      !execStateRef.current.next
+    ) {
+      endExec();
     }
+  };
+
+  const endExec = () => {
+    execStateRef.current.nextTimer &&
+      clearTimeout(execStateRef.current.nextTimer);
+
+    execStateRef.current.programTimers.forEach((t) =>
+      clearTimeout(t),
+    );
+
+    execStateRef.current.programIntervals.forEach((t) =>
+      clearInterval(t as any),
+    );
+
+    execStateRef.current.marker?.clear();
 
     execStateRef.current.autoStepping = false;
     execStateRef.current.running = false;
     execStateRef.current.next = undefined;
-    execStateRef.current.marker?.clear();
-    execStateRef.current.nextTimer &&
-      clearTimeout(execStateRef.current.nextTimer);
 
     update();
+  };
+
+  const progressExec = () => {
+    if (!execStateRef.current.running) {
+      startExec();
+    } else if (execStateRef.current.next) {
+      execStateRef.current.next();
+    } else {
+      maybeEndExec();
+    }
   };
 
   const startExec = () => {
@@ -286,16 +282,107 @@ export default function Meta() {
       watchValues,
     });
 
+    const prepareHooks = () => {
+      return {
+        clearTimeout: (timer: number) => {
+          execStateRef.current.programTimers.delete(timer);
+          clearTimeout(timer);
+        },
+        clearInterval: (timer: number) => {
+          execStateRef.current.programIntervals.delete(
+            timer,
+          );
+
+          clearInterval(timer as any);
+        },
+        setTimeout: function (fn: () => void, ms: number) {
+          const { e, closure, config } = getMetaFunction(
+            fn,
+          );
+
+          const timer = (setTimeout as SetTimeout)(() => {
+            execStateRef.current.programTimers.delete(
+              timer,
+            );
+
+            evaluate(
+              { type: 'Apply', e, fn, args: [] },
+              maybeEndExec,
+              handleError,
+              closure,
+              config,
+            );
+          }, ms);
+
+          execStateRef.current.programTimers.add(timer);
+
+          return timer;
+        },
+        setInterval: function (fn: () => void, ms: number) {
+          const { e, closure, config } = getMetaFunction(
+            fn,
+          );
+
+          const timer = (setInterval as SetTimeout)(() => {
+            evaluate(
+              { type: 'Apply', e, fn, args: [] },
+              maybeEndExec,
+              handleError,
+              closure,
+              config,
+            );
+          }, ms);
+
+          execStateRef.current.programIntervals.add(timer);
+
+          return timer;
+        },
+      };
+    };
+
+    // const prepareHooks = () => {
+    //   return liftedAll({
+    //     setTimeout: function _setTimeout(
+    //       [fn, ms]: [() => void, number],
+    //       c: (a: any) => void,
+    //       cerr: (a: any) => void,
+    //     ) {
+    //       console.log('setTimeout', [fn, ms], c, cerr);
+
+    //       const timer = setTimeout(() => {
+    //         execStateRef.current.programTimers.delete(
+    //           timer,
+    //         );
+    //         const { e, closure, config } = getMetaFunction(
+    //           fn,
+    //         );
+    //         console.log(e);
+    //         CallExpression(
+    //           { callee: e.id, arguments: [] },
+    //           c,
+    //           cerr,
+    //           closure,
+    //           config,
+    //         );
+    //       }, ms);
+
+    //       execStateRef.current.programTimers.add(timer);
+    //     },
+    //   });
+    // };
+
     const updateStackState = (e: Evaluation) => {
-      const fnName = e.e?.e?.callee.name;
+      const fnName =
+        e.e?.e?.callee?.name || e.e?.e?.id?.name;
+
       if (fnName && e.e.type === 'Apply') {
         if (e.phase === 'enter') {
           const id = `${allStackNodes.length}`;
           const frame: StackFrame = {
             fnName,
-            args: e.e.args,
             id,
             name: id,
+            args: e.e.args,
             children: [],
             values: {},
             hasReturned: false,
@@ -337,6 +424,11 @@ export default function Meta() {
       });
     };
 
+    const handleError = (err: any) => {
+      alert(JSON.stringify(err));
+      console.error(err);
+    };
+
     const makeNodeHandlers = (names: NodeNames[]) => {
       const map: Partial<{ [name in NodeNames]: any }> = {};
 
@@ -349,12 +441,14 @@ export default function Meta() {
           config: EvaluationConfig,
         ) => {
           const next = () => {
+            execStateRef.current.next = undefined;
             const f = ECMAScriptInterpreters.values[
               name
             ] as any;
 
             f(e, c, cerr, env, config);
           };
+
           // HACK: Program statements (not interesting) are handled as BlockStatements by the interpreter
           if (e.type === 'Program') {
             next();
@@ -364,11 +458,11 @@ export default function Meta() {
           if (execStateRef.current.autoStepping) {
             const run = () => {
               if (execStateRef.current.autoStepping) {
-                next();
+                setTimeout(next, 10);
               }
             };
 
-            execStateRef.current.nextTimer = setTimeout(
+            execStateRef.current.nextTimer = (setTimeout as SetTimeout)(
               run,
               execStateRef.current.speed,
             );
@@ -383,13 +477,10 @@ export default function Meta() {
 
     metaesEval(
       code,
-      endExec,
-      (err) => {
-        alert(JSON.stringify(err));
-        endExec();
-      },
+      maybeEndExec,
+      handleError,
       {
-        // ...prepareMetaFunctions(),
+        ...prepareHooks(),
         ...globalObjs,
       },
       {
@@ -431,24 +522,13 @@ export default function Meta() {
   };
 
   const handleStep = () => {
-    if (!execStateRef.current.running) {
-      startExec();
-    } else if (execStateRef.current.next) {
-      execStateRef.current.next();
-    } else {
-      endExec();
-    }
+    progressExec();
     update();
   };
 
   const handleAutoStep = () => {
     execStateRef.current.autoStepping = true;
-    if (!execStateRef.current.running) {
-      startExec();
-    } else if (execStateRef.current.next) {
-      execStateRef.current.next();
-    }
-
+    progressExec();
     update();
   };
 
@@ -466,10 +546,8 @@ export default function Meta() {
   };
 
   const handleExit = () => {
-    if (execStateRef.current.running) {
-      endExec();
-      update();
-    }
+    endExec();
+    update();
   };
 
   const callGraphEl = (

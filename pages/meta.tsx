@@ -1,20 +1,8 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, ReactElement } from 'react';
 import { render } from 'react-dom';
 
-import { metaesEval } from 'metaes';
-import {
-  Continuation,
-  ErrorContinuation,
-  Environment,
-  EvaluationConfig,
-  Evaluation,
-  ASTNode,
-} from 'metaes/types';
-import { JavaScriptASTNode } from 'metaes/nodeTypes';
-import { ECMAScriptInterpreters } from 'metaes/interpreters';
-import { SetValue } from 'metaes/environment';
+import { Evaluation, ASTNode } from 'metaes/types';
 import { getMetaFunction } from 'metaes/metafunction';
-import { evaluate } from 'metaes/evaluate';
 
 import dynamic from 'next/dynamic';
 import { TextMarker, Editor, Position } from 'codemirror';
@@ -24,7 +12,12 @@ import isObject from 'lodash/isObject';
 import isString from 'lodash/isString';
 import isDate from 'lodash/isDate';
 import isArray from 'lodash/isArray';
-import omit from 'lodash/omit';
+import {
+  meta,
+  StackFrame,
+  WatchValues,
+  interestingTypes,
+} from 'helpers/meta';
 
 const CodeEditor = dynamic(
   import('components/CodeEditor'),
@@ -37,93 +30,39 @@ const Tree = dynamic(import('react-d3-tree'), {
   ssr: false,
 });
 
-type Timeout = (fn: () => void, ms: number) => number;
-
-type StackFrame = {
-  id: string;
-  name: string;
-  fnName: string;
-  args: any[];
-  values: {
-    [key: string]: any;
-  };
-  returnValue: any;
-  children: StackFrame[];
-  hasReturned: boolean;
-  sourceId: string;
-};
-
-type WatchValues = Record<
-  string,
-  { frame: StackFrame; value: any }[]
->;
-
-const programFrame = () => ({
-  fnName: 'Program',
-  id: '-1',
-  name: '-1',
-  args: [],
-  children: [],
-  values: {},
-  hasReturned: false,
-  returnValue: undefined,
-  sourceId: 'Program!',
-});
-
-const globalObjects = {
-  Number,
-  Boolean,
-  Array,
-  Object,
-  Function,
-  String,
-  RegExp,
-  Date,
-  Math,
-  Map,
-  Set,
-  WeakMap,
-  WeakSet,
-  Error,
-  parseInt,
-  parseFloat,
-  isNaN,
-  JSON,
-  console,
-};
-
-type NodeNames = keyof typeof ECMAScriptInterpreters.values;
-
-const interestingTypes: NodeNames[] = [
-  'BlockStatement',
-  'ReturnStatement',
-  'AssignmentPattern',
-  'AssignmentExpression',
-  'VariableDeclaration',
-  'CallExpression',
-  'ExpressionStatement',
-  'IfStatement',
-  'ForStatement',
-  'ForInStatement',
-  'ForOfStatement',
-  'WhileStatement',
-  'ConditionalExpression',
-];
-
 const handleError = (err: any) => {
   alert(JSON.stringify(err));
   console.error(err);
 };
 
+function astToCmLoc(e: ASTNode) {
+  if (!e.loc) return;
+
+  const start = {
+    ch: e.loc.start.column,
+    line: e.loc.start.line - 1,
+  };
+
+  const end = {
+    ch: e.loc.end.column,
+    line: e.loc.end.line - 1,
+  };
+  return { start, end };
+}
+
 function addWidget(
   cm: Editor,
   p: Position,
-  node: HTMLElement,
+  el: ReactElement,
 ) {
   const pos = cm.charCoords(p, 'local');
 
   const top = pos.top;
   const right = pos.right;
+  const node = document.createElement('div');
+
+  render(el, node);
+
   node.style.position = 'absolute';
   node.setAttribute('cm-ignore-events', 'true');
   node.style.top = top + 'px';
@@ -132,6 +71,8 @@ function addWidget(
   cm.display.input.setUneditable(node);
   // @ts-ignore
   cm.display.sizer.appendChild(node);
+
+  return node;
 }
 
 function formatValue(arg: any): string {
@@ -200,7 +141,7 @@ function x(num) {
 const r = x(4);
 `;
 
-const Val = ({ value }: { value: string }) => (
+const EditorValue = ({ value }: { value: string }) => (
   <div
     style={{
       marginLeft: 8,
@@ -234,9 +175,12 @@ const GraphNode = ({
   );
 };
 
+const defaultSpeed = 600;
+const maxSpeed = 2000;
+const minSpeed = 60;
+
 export default function Meta() {
   const [, forceUpdate] = useState({});
-  const update = () => forceUpdate({});
   const [stackState, setStackState] = useState<{
     currentEvaluation?: Evaluation;
     callsRootImmutableRef: StackFrame[];
@@ -263,74 +207,56 @@ export default function Meta() {
     editorWidgetsByNode: new Map(),
   });
 
-  const execStateRef = useRef<{
-    callStack: StackFrame[];
-    autoStepping: boolean;
-    running: boolean;
-    speed: number;
-    nextTimer?: number;
-    next?: () => any;
-    programTimers: Set<number>;
-    programIntervals: Set<number>;
-    allStackNodes: StackFrame[];
-    watchValues: WatchValues;
-    callsRootImmutableRef: StackFrame[];
-  }>({
-    callStack: [],
-    autoStepping: false,
-    running: false,
-    speed: 400,
-    next: undefined,
-    nextTimer: undefined,
-    programTimers: new Set(),
-    programIntervals: new Set(),
-    allStackNodes: [],
-    callsRootImmutableRef: [],
-    watchValues: {},
-  });
-
   // editor ui
 
   const markEditor = (evaluation: Evaluation) => {
-    const loc = astToCmLoc(evaluation.e);
-    if (!loc) return;
-
-    const { start, end } = loc;
-
     editorItemsRef.current.marker?.clear();
 
-    editorRef.current?.setCursor(start, 20);
+    const editor = editorRef.current;
+    const loc = astToCmLoc(evaluation.e);
+    if (!loc || !editor) return;
 
-    editorItemsRef.current.marker = editorRef.current?.markText(
-      start,
-      end,
+    const editorScrollInfo = editor.getScrollInfo();
+    const { top } = editor.charCoords(loc.start, 'local');
+
+    editorItemsRef.current.marker = editor.markText(
+      loc.start,
+      loc.end,
       {
         css: 'background-color: rgba(230, 10, 100, 0.5);',
       },
     );
+
+    if (
+      editorScrollInfo.top > top ||
+      top >
+        editorScrollInfo.top + editorScrollInfo.clientHeight
+    ) {
+      editor.scrollTo(null, top);
+    }
   };
 
-  const addValueToEditor = (node: ASTNode, value: any) => {
+  const displayValueInEditor = (
+    node: ASTNode,
+    frame: StackFrame,
+    value: any,
+  ) => {
     if (!editorRef.current) return;
 
     const loc = astToCmLoc(node);
     if (!loc) return;
 
-    const frame = currentFrame();
     const key = (node.range ?? []).join();
 
     const { line } = loc.start;
     const ch =
       editorRef.current?.lineInfo(line)?.text?.length ?? 0;
 
-    const el = document.createElement('div');
-    render(<Val value={value} />, el);
-
     // @ts-ignore
-    addWidget(
+    const el = addWidget(
       editorRef.current,
       { line: line, ch: ch },
-      el,
+      <EditorValue value={value} />,
     );
 
     editorItemsRef.current.editorWidgetsByNode
@@ -345,7 +271,10 @@ export default function Meta() {
     return el;
   };
 
-  const displayEvaluation = (evaluation: Evaluation) => {
+  const displayEvaluation = (
+    evaluation: Evaluation,
+    frame: StackFrame,
+  ) => {
     if (interestingTypes.includes(evaluation.e.type)) {
       markEditor(evaluation);
     }
@@ -354,8 +283,9 @@ export default function Meta() {
       evaluation.phase === 'exit' &&
       evaluation.e.type === 'AssignmentExpression'
     ) {
-      addValueToEditor(
+      displayValueInEditor(
         evaluation.e,
+        frame,
         `= ${evaluation.value}`,
       );
     }
@@ -364,8 +294,9 @@ export default function Meta() {
       evaluation.phase === 'exit' &&
       evaluation.e.type === 'VariableDeclarator'
     ) {
-      addValueToEditor(
+      displayValueInEditor(
         evaluation.e.id,
+        frame,
         `= ${evaluation.value}`,
       );
     }
@@ -374,8 +305,9 @@ export default function Meta() {
       evaluation.phase === 'exit' &&
       evaluation.e.type === 'ReturnStatement'
     ) {
-      addValueToEditor(
+      displayValueInEditor(
         evaluation.e,
+        frame,
         `⇐ ${evaluation.value.value}`,
       );
     }
@@ -385,7 +317,8 @@ export default function Meta() {
     evaluation: Evaluation,
     frame: StackFrame,
   ) => {
-    const metaFn = getMetaFunction(evaluation.e.fn).e;
+    const metaFn = getMetaFunction(evaluation.e.fn)?.e;
+    if (!metaFn) return;
 
     const nodes = editorItemsRef.current.editorWidgetsByNode.get(
       frame.sourceId,
@@ -398,8 +331,9 @@ export default function Meta() {
       new Map(),
     );
 
-    addValueToEditor(
+    displayValueInEditor(
       metaFn,
+      frame,
       `( ${evaluation.e.args.join(', ')} )`,
     );
   };
@@ -408,299 +342,25 @@ export default function Meta() {
     evaluation: Evaluation,
     frame: StackFrame,
   ) => {
-    const metaFn = getMetaFunction(evaluation.e.fn).e;
+    const metaFn = getMetaFunction(evaluation.e.fn)?.e;
+    if (!metaFn) return;
+
     frame.hasReturned = true;
     frame.returnValue = evaluation.value;
 
-    addValueToEditor(
+    displayValueInEditor(
       metaFn,
+      frame,
       `( ${evaluation.e.args.join(', ')} ) => ${
         frame.returnValue
       }`,
     );
   };
 
-  const progressExec = () => {
-    if (!execStateRef.current.running) {
-      const code = editorRef.current?.getDoc().getValue();
-      if (code) {
-        startExec(code);
-      }
-    } else if (execStateRef.current.next) {
-      execStateRef.current.next();
-    } else {
-      maybeEndExec();
-    }
-  };
-
-  // helpers
-
-  const currentFrame = () =>
-    execStateRef.current.callStack[
-      execStateRef.current.callStack.length - 1
-    ];
-
-  const makeHooks = () => {
-    const runMetaFunction = (fn: Function) => {
-      const { e, closure, config } = getMetaFunction(fn);
-
-      evaluate(
-        { e, fn, type: 'Apply', args: [] },
-        maybeEndExec,
-        handleError,
-        closure,
-        config,
-      );
-    };
-
-    return {
-      clearTimeout: (timer: number) => {
-        execStateRef.current.programTimers.delete(timer);
-        clearTimeout(timer);
-      },
-      clearInterval: (timer: number) => {
-        execStateRef.current.programIntervals.delete(timer);
-        clearInterval(timer);
-      },
-      setTimeout: function (fn: () => void, ms: number) {
-        const timer = (setTimeout as Timeout)(() => {
-          execStateRef.current.programTimers.delete(timer);
-
-          runMetaFunction(fn);
-        }, ms);
-
-        execStateRef.current.programTimers.add(timer);
-
-        return timer;
-      },
-      setInterval: function (fn: () => void, ms: number) {
-        const timer = (setInterval as Timeout)(() => {
-          runMetaFunction(fn);
-        }, ms);
-
-        execStateRef.current.programIntervals.add(timer);
-
-        return timer;
-      },
-    };
-  };
-
-  const makeNodeHandlers = (names: NodeNames[]) => {
-    const map: Partial<{ [name in NodeNames]: any }> = {};
-
-    for (const name of names) {
-      map[name] = (
-        node: JavaScriptASTNode,
-        c: Continuation,
-        cerr: ErrorContinuation,
-        env: Environment,
-        config: EvaluationConfig,
-      ) => {
-        const next = () => {
-          execStateRef.current.next = undefined;
-          const f = ECMAScriptInterpreters.values[
-            name
-          ] as any;
-
-          f(node, c, cerr, env, config);
-        };
-
-        // HACK: Program statements (not interesting) are handled as BlockStatements by the interpreter
-        if (node.type === 'Program') {
-          next();
-          return;
-        }
-
-        if (execStateRef.current.autoStepping) {
-          const run = () => {
-            if (execStateRef.current.autoStepping) {
-              setTimeout(next, 10);
-            }
-          };
-
-          execStateRef.current.nextTimer = (setTimeout as Timeout)(
-            run,
-            execStateRef.current.speed,
-          );
-        }
-
-        execStateRef.current.next = next;
-      };
-    }
-
-    return map;
-  };
-
-  const updateStackState = (evaluation: Evaluation) => {
-    const fnName =
-      evaluation.e?.e?.callee?.name ||
-      evaluation.e?.e?.id?.name;
-
-    if (fnName && evaluation.e.type === 'Apply') {
-      if (evaluation.phase === 'enter') {
-        const metaFn = getMetaFunction(evaluation.e.fn).e;
-        const id = `${execStateRef.current.allStackNodes.length}`;
-        const frame: StackFrame = {
-          fnName,
-          id,
-          name: id,
-          args: evaluation.e.args,
-          children: [],
-          values: {},
-          hasReturned: false,
-          returnValue: undefined,
-          sourceId: metaFn.range.join(),
-        };
-
-        currentFrame().children.push(frame);
-
-        execStateRef.current.callStack.push(frame);
-        execStateRef.current.allStackNodes.push(frame);
-        execStateRef.current.callsRootImmutableRef = [
-          ...execStateRef.current.callsRootImmutableRef,
-        ];
-
-        displayApplyEnter(evaluation, frame);
-      } else {
-        displayApplyExit(evaluation, currentFrame());
-        execStateRef.current.callStack.pop();
-        execStateRef.current.callsRootImmutableRef = [
-          ...execStateRef.current.callsRootImmutableRef,
-        ];
-      }
-    } else {
-      const frame = currentFrame();
-      if (frame.id === '-1') {
-        const values = omit(
-          evaluation.env?.values ?? {},
-          // programEnvKeys,
-        );
-
-        frame.values = values;
-      } else {
-        frame.values = evaluation.env?.values ?? {};
-      }
-    }
-
-    displayEvaluation(evaluation);
-
-    setStackState({
-      callsRootImmutableRef:
-        execStateRef.current.callsRootImmutableRef,
-      allNodes: execStateRef.current.allStackNodes,
-      stack: execStateRef.current.callStack,
-      watchValues: execStateRef.current.watchValues,
-    });
-  };
-
-  const handleSetValue = (
-    e: {
-      name: string;
-      value: any;
-      isDeclaration: boolean;
-    },
-    c: Continuation,
-    cerr: ErrorContinuation,
-    env: Environment,
-  ) => {
-    const frame = currentFrame();
-    const k = `${frame?.fnName ?? ''}:${e.name}`;
-    execStateRef.current.watchValues[k] =
-      execStateRef.current.watchValues[k] ?? [];
-    execStateRef.current.watchValues[k].push({
-      frame,
-      value: e.value,
-    });
-
-    SetValue(e, c, cerr, env);
-  };
-
-  // exec
-
-  const startExec = (code: string) => {
-    if (
-      !editorRef.current ||
-      execStateRef.current.running
-    ) {
-      return;
-    }
-
-    clearExec();
-
-    execStateRef.current.callStack = [programFrame()];
-    execStateRef.current.allStackNodes = [];
-    execStateRef.current.watchValues = {};
-
-    // cheating a bit here to optimize react-d3-tree rendering
-    // callsRootImmutableRef is an immutable *reference*
-    // BUT it's values mutate
-    // NOTE - it will not be reassigned if stack frame variable change
-    execStateRef.current.callsRootImmutableRef = [];
-
-    execStateRef.current.running = true;
-
-    // const prepareHooks = () => {
-    //   return liftedAll({
-    //   });
-    // };
-
-    const programEnv = {
-      ...makeHooks(),
-      ...globalObjects,
-    };
-
-    const programEnvKeys = Object.keys(programEnv);
-
-    metaesEval(
-      code,
-      maybeEndExec,
-      handleError,
-      programEnv,
-      {
-        interceptor: updateStackState,
-        interpreters: {
-          prev: ECMAScriptInterpreters,
-          values: {
-            ...makeNodeHandlers(interestingTypes),
-            SetValue: handleSetValue,
-          },
-        },
-      },
-    );
-  };
-
-  const maybeEndExec = () => {
-    if (
-      !execStateRef.current.programTimers.size &&
-      !execStateRef.current.programIntervals.size &&
-      !execStateRef.current.next
-    ) {
-      endExec();
-    }
-  };
-
-  const endExec = () => {
-    execStateRef.current.nextTimer &&
-      clearTimeout(execStateRef.current.nextTimer);
-
-    execStateRef.current.programTimers.forEach((t) =>
-      clearTimeout(t),
-    );
-
-    execStateRef.current.programIntervals.forEach((t) =>
-      clearInterval(t as any),
-    );
-
+  const clearCurrentMarker = () =>
     editorItemsRef.current.marker?.clear();
 
-    execStateRef.current.autoStepping = false;
-    execStateRef.current.running = false;
-    execStateRef.current.next = undefined;
-
-    update();
-  };
-
-  const clearExec = () => {
+  const clearState = () => {
     editorItemsRef.current.editorWidgetsByNode.forEach(
       (l) => l.forEach((n) => n.remove()),
     );
@@ -715,40 +375,85 @@ export default function Meta() {
     });
   };
 
+  const update = () =>
+    setStackState({
+      callsRootImmutableRef:
+        metaRef.current.execState.callsRootImmutableRef,
+      allNodes: metaRef.current.execState.allStackNodes,
+      stack: metaRef.current.execState.callStack,
+      watchValues: metaRef.current.execState.watchValues,
+    });
+
+  const configEditor = (editor: Editor) => {
+    editor.on('change', () => {
+      clearState();
+    });
+    editorRef.current = editor;
+  };
+
   // event handlers
 
+  const nextStep = () => {
+    const state = metaRef.current.execState;
+    if (!state.running) {
+      const code = editorRef.current?.getDoc().getValue();
+      if (code) {
+        clearState();
+        metaRef.current.startExec(code);
+      }
+    } else {
+      metaRef.current.progressExec();
+    }
+  };
+
   const handleStep = () => {
-    progressExec();
+    nextStep();
     update();
   };
 
   const handleAutoStep = () => {
-    execStateRef.current.autoStepping = true;
-    progressExec();
+    metaRef.current.execState.autoStepping = true;
+    nextStep();
     update();
   };
 
   const handleAutoStepPause = () => {
-    execStateRef.current.autoStepping = false;
+    metaRef.current.execState.autoStepping = false;
     update();
   };
 
   const handleRestart = () => {
-    const autoStepping = execStateRef.current.autoStepping;
-    endExec();
-    execStateRef.current.autoStepping = autoStepping;
+    const autoStepping =
+      metaRef.current.execState.autoStepping;
+    metaRef.current.endExec();
+    clearCurrentMarker();
+    metaRef.current.execState.autoStepping = autoStepping;
 
     const code = editorRef.current?.getDoc().getValue();
     if (code) {
-      startExec(code);
+      clearState();
+      metaRef.current.startExec(code);
       update();
     }
   };
 
   const handleExit = () => {
-    endExec();
+    metaRef.current.endExec();
+    clearCurrentMarker();
+
     update();
   };
+
+  const metaRef = useRef(
+    meta({
+      speed: defaultSpeed,
+      handleError,
+      displayApplyEnter,
+      displayApplyExit,
+      displayEvaluation,
+      update,
+    }),
+  );
 
   // view helpers
 
@@ -929,12 +634,10 @@ export default function Meta() {
           className="space-small"
         >
           <CodeEditor
-            editorDidMount={(editor) => {
-              return (editorRef.current = editor);
-            }}
+            editorDidMount={configEditor}
             value={code}
             options={{
-              readOnly: execStateRef.current.running,
+              readOnly: metaRef.current.execState.running,
               lineNumbers: true,
             }}
           />
@@ -942,7 +645,9 @@ export default function Meta() {
         <div className="space-small">
           <button
             className="small"
-            disabled={execStateRef.current.autoStepping}
+            disabled={
+              metaRef.current.execState.autoStepping
+            }
             onClick={handleStep}
           >
             Step
@@ -950,14 +655,18 @@ export default function Meta() {
           {' | '}
           <button
             className="small"
-            disabled={execStateRef.current.autoStepping}
+            disabled={
+              metaRef.current.execState.autoStepping
+            }
             onClick={handleAutoStep}
           >
             Auto-step
           </button>{' '}
           <button
             className="small"
-            disabled={!execStateRef.current.autoStepping}
+            disabled={
+              !metaRef.current.execState.autoStepping
+            }
             onClick={handleAutoStepPause}
           >
             Pause
@@ -965,14 +674,14 @@ export default function Meta() {
           {' | '}
           <button
             className="small"
-            disabled={!execStateRef.current.running}
+            disabled={!metaRef.current.execState.running}
             onClick={handleRestart}
           >
             Restart
           </button>{' '}
           <button
             className="small"
-            disabled={!execStateRef.current.running}
+            disabled={!metaRef.current.execState.running}
             onClick={handleExit}
           >
             Exit
@@ -981,13 +690,18 @@ export default function Meta() {
         <div>
           <label>Playback speed</label>{' '}
           <input
-            defaultValue={2000 - execStateRef.current.speed}
+            defaultValue={
+              maxSpeed - metaRef.current.execState.speed
+            }
             type="range"
             min="0"
             max="2000"
             onChange={(e) => {
-              execStateRef.current.speed =
-                2100 - parseInt(e.target.value);
+              metaRef.current.setSpeed(
+                maxSpeed +
+                  minSpeed -
+                  parseInt(e.target.value),
+              );
             }}
           />
         </div>
@@ -1003,7 +717,7 @@ export default function Meta() {
         }}
       >
         {callStackEl}
-        {/* {callGraphEl} */}
+        {callGraphEl}
       </div>
     </div>
   );
@@ -1011,18 +725,3 @@ export default function Meta() {
 
 // @ts-ignore
 Meta.layout = null;
-
-function astToCmLoc(e: ASTNode) {
-  if (!e.loc) return;
-
-  const start = {
-    ch: e.loc.start.column,
-    line: e.loc.start.line - 1,
-  };
-
-  const end = {
-    ch: e.loc.end.column,
-    line: e.loc.end.line - 1,
-  };
-  return { start, end };
-}

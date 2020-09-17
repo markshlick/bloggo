@@ -87,6 +87,21 @@ const programFrame = () => ({
   sourceId: 'Program!',
 });
 
+const elog = (evaluation: Evaluation) => {
+  const type = evaluation.e.type;
+  if (
+    ![
+      'GetValue',
+      'SetValue',
+      'Identifier',
+      'Literal',
+      'VariableDeclaration',
+    ].includes(type)
+  ) {
+    console.log(evaluation.e.type, evaluation);
+  }
+};
+
 export function meta({
   speed,
   handleError,
@@ -128,18 +143,18 @@ export function meta({
     callbackQueue: Function[];
   } = {
     speed,
-    callStack: [],
     autoStepping: false,
     running: false,
     next: undefined,
     nextTimer: undefined,
     programTimers: new Set(),
     programIntervals: new Set(),
-    allStackNodes: [],
-    callsRootImmutableRef: [],
     watchValues: {},
     programEnvKeys: [],
     callbackQueue: [],
+    callStack: [],
+    callsRootImmutableRef: [],
+    allStackNodes: [],
   };
 
   const currentFrame = () =>
@@ -247,17 +262,7 @@ export function meta({
   };
 
   const updateStackState = (evaluation: Evaluation) => {
-    const type = evaluation.e.type;
-    if (
-      ![
-        'GetValue',
-        'SetValue',
-        'Identifier',
-        'Literal',
-        'VariableDeclaration',
-      ].includes(type)
-    )
-      console.log(evaluation.e.type, evaluation);
+    elog(evaluation);
 
     const fnName =
       evaluation.e?.e?.callee?.name ||

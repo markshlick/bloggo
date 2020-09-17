@@ -124,7 +124,7 @@ function y(a) {
   return a;
 }
 
-function x(num) {
+function x(n) {
   let s = 0;
   for (let i = 0; i <= 3; i++) {
     s = i;
@@ -135,10 +135,10 @@ function x(num) {
 
   const b = y(2);
 
-  return a + b + y(3);
+  return a + b + y(3) + n;
 }
 
-const r = x(4);
+const r = y(4);
 `;
 
 const EditorValue = ({ value }: { value: string }) => (
@@ -179,21 +179,7 @@ const defaultSpeed = 600;
 const maxSpeed = 2000;
 const minSpeed = 60;
 
-export default function Meta() {
-  const [, forceUpdate] = useState({});
-  const [stackState, setStackState] = useState<{
-    currentEvaluation?: Evaluation;
-    callsRootImmutableRef: StackFrame[];
-    stack: StackFrame[];
-    allNodes: StackFrame[];
-    watchValues: WatchValues;
-  }>({
-    stack: [],
-    callsRootImmutableRef: [],
-    allNodes: [],
-    watchValues: {},
-  });
-
+function useEditorState() {
   const editorRef = useRef<Editor>();
 
   const editorItemsRef = useRef<{
@@ -207,7 +193,12 @@ export default function Meta() {
     editorWidgetsByNode: new Map(),
   });
 
-  // editor ui
+  const configEditor = (editor: Editor) => {
+    editor.on('change', () => {
+      clearEditor();
+    });
+    editorRef.current = editor;
+  };
 
   const markEditor = (evaluation: Evaluation) => {
     editorItemsRef.current.marker?.clear();
@@ -236,6 +227,22 @@ export default function Meta() {
     }
   };
 
+  const getFrameWidgets = (frame: StackFrame) => {
+    let frameWidgets = editorItemsRef.current.editorWidgetsByNode.get(
+      frame.sourceId,
+    );
+
+    if (!frameWidgets) {
+      frameWidgets = new Map();
+      editorItemsRef.current.editorWidgetsByNode.set(
+        frame.sourceId,
+        frameWidgets,
+      );
+    }
+
+    return frameWidgets;
+  };
+
   const displayValueInEditor = (
     node: ASTNode,
     frame: StackFrame,
@@ -259,14 +266,9 @@ export default function Meta() {
       <EditorValue value={value} />,
     );
 
-    editorItemsRef.current.editorWidgetsByNode
-      .get(frame.sourceId)
-      ?.get(key)
-      ?.remove();
-
-    editorItemsRef.current.editorWidgetsByNode
-      .get(frame.sourceId)
-      ?.set(key, el);
+    const frameWidgets = getFrameWidgets(frame);
+    frameWidgets.get(key)?.remove();
+    frameWidgets.set(key, el);
 
     return el;
   };
@@ -309,6 +311,16 @@ export default function Meta() {
         evaluation.e,
         frame,
         `⇐ ${evaluation.value.value}`,
+      );
+    }
+
+    if (
+      evaluation.phase === 'enter' &&
+      evaluation.e.type === 'Program'
+    ) {
+      editorItemsRef.current.editorWidgetsByNode.set(
+        frame.sourceId,
+        new Map(),
       );
     }
   };
@@ -360,13 +372,58 @@ export default function Meta() {
   const clearCurrentMarker = () =>
     editorItemsRef.current.marker?.clear();
 
-  const clearState = () => {
+  const clearEditor = () => {
+    clearCurrentMarker();
     editorItemsRef.current.editorWidgetsByNode.forEach(
       (l) => l.forEach((n) => n.remove()),
     );
 
     editorItemsRef.current.editorWidgetsByNode = new Map();
+  };
 
+  const getCode = () =>
+    editorRef.current?.getDoc().getValue();
+
+  return {
+    getCode,
+    clearEditor,
+    clearCurrentMarker,
+    displayApplyEnter,
+    displayApplyExit,
+    displayEvaluation,
+    configEditor,
+  };
+}
+
+export default function Meta() {
+  const [, forceUpdate] = useState({});
+  const [stackState, setStackState] = useState<{
+    currentEvaluation?: Evaluation;
+    callsRootImmutableRef: StackFrame[];
+    stack: StackFrame[];
+    allNodes: StackFrame[];
+    watchValues: WatchValues;
+  }>({
+    stack: [],
+    callsRootImmutableRef: [],
+    allNodes: [],
+    watchValues: {},
+  });
+
+  const {
+    getCode,
+    clearEditor,
+    clearCurrentMarker,
+    displayApplyEnter,
+    displayApplyExit,
+    displayEvaluation,
+    configEditor,
+  } = useEditorState();
+
+  // editor ui
+
+  const clearState = () => {
+    clearEditor();
     setStackState({
       watchValues: {},
       stack: [],
@@ -384,19 +441,12 @@ export default function Meta() {
       watchValues: metaRef.current.execState.watchValues,
     });
 
-  const configEditor = (editor: Editor) => {
-    editor.on('change', () => {
-      clearState();
-    });
-    editorRef.current = editor;
-  };
-
   // event handlers
 
   const nextStep = () => {
     const state = metaRef.current.execState;
     if (!state.running) {
-      const code = editorRef.current?.getDoc().getValue();
+      const code = getCode();
       if (code) {
         clearState();
         metaRef.current.startExec(code);
@@ -429,7 +479,7 @@ export default function Meta() {
     clearCurrentMarker();
     metaRef.current.execState.autoStepping = autoStepping;
 
-    const code = editorRef.current?.getDoc().getValue();
+    const code = getCode();
     if (code) {
       clearState();
       metaRef.current.startExec(code);

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { render } from 'react-dom';
 
 import { metaesEval } from 'metaes';
 import {
@@ -7,6 +8,7 @@ import {
   Environment,
   EvaluationConfig,
   Evaluation,
+  ASTNode,
 } from 'metaes/types';
 import { JavaScriptASTNode } from 'metaes/nodeTypes';
 import { ECMAScriptInterpreters } from 'metaes/interpreters';
@@ -15,13 +17,33 @@ import { getMetaFunction } from 'metaes/metafunction';
 import { evaluate } from 'metaes/evaluate';
 
 import dynamic from 'next/dynamic';
-import { TextMarker, Editor } from 'codemirror';
-import {
-  isFunction,
-  isObject,
-  isString,
-  isDate,
-} from 'util';
+import { TextMarker, Editor, Position } from 'codemirror';
+
+import isFunction from 'lodash/isFunction';
+import isObject from 'lodash/isObject';
+import isString from 'lodash/isString';
+import isDate from 'lodash/isDate';
+import isArray from 'lodash/isArray';
+import omit from 'lodash/omit';
+
+function addWidget(
+  cm: Editor,
+  p: Position,
+  node: HTMLElement,
+) {
+  const pos = cm.charCoords(p, 'local');
+
+  const top = pos.top;
+  const right = pos.right;
+  node.style.position = 'absolute';
+  node.setAttribute('cm-ignore-events', 'true');
+  node.style.top = top + 'px';
+  node.style.left = right + 'px';
+  // @ts-ignore
+  cm.display.input.setUneditable(node);
+  // @ts-ignore
+  cm.display.sizer.appendChild(node);
+}
 
 const CodeEditor = dynamic(
   import('components/CodeEditor'),
@@ -34,17 +56,24 @@ const Tree = dynamic(import('react-d3-tree'), {
   ssr: false,
 });
 
-type SetTimeout = (fn: () => void, ms: number) => number;
+type Timeout = (fn: () => void, ms: number) => number;
 
-function formatValue(arg: any) {
+function formatValue(arg: any): string {
   if (isFunction(arg)) {
     return `fn()`;
+  } else if (isArray(arg)) {
+    return isArray(arg[0])
+      ? `[...]`
+      : `[${formatValue(arg[0])}${
+          arg.length > 1 ? ', ...' : ''
+        }]`;
   } else if (isObject(arg)) {
+    const keys = Object.keys(arg);
     return `${
       arg.constructor.name === 'Object'
         ? ''
         : arg.constructor.name
-    }{${Object.keys(arg).join(', ')}}`;
+    }{${keys.join(', ')}}`;
   } else if (isDate(arg)) {
     return `Date{${arg.toISOString()}}`;
   } else if (isString(arg)) {
@@ -58,22 +87,44 @@ function formatArgs(args: any[]) {
   return args.map((arg) => formatValue(arg)).join(', ');
 }
 
+// const code = `// psst: you can edit me!
+// function fibonacci(num) {
+//   if (num < 0) return null;
+//   if (num <= 1) return num;
+
+//   const f1 = fibonacci(num - 1);
+//   const f2 = fibonacci(num - 2);
+//   const result = f1 + f2;
+
+//   return result;
+// }
+
+// fibonacci(4);
+// `;
+
 const code = `// psst: you can edit me!
-function fibonacci(num) {
-  if (num < 0) return null;
-  if (num <= 1) return num;
-
-  const f1 = fibonacci(num - 1);
-  const f2 = fibonacci(num - 2);
-  const result = f1 + f2;
-
-  return result;
+function y(a) {
+  return a;
 }
 
-fibonacci(4);
+function x(num) {
+  let s = 0;
+  for (let i = 0; i <= 3; i++) {
+    s = i;
+  }
+  
+  let a;
+  a = 1;
+
+  const b = y(2);
+
+  return a + b + y(3);
+}
+
+const r = x(4);
 `;
 
-const globalObjs = {
+const globalObjects = {
   Number,
   Boolean,
   Array,
@@ -124,6 +175,7 @@ type StackFrame = {
   returnValue: any;
   children: StackFrame[];
   hasReturned: boolean;
+  sourceId: string;
 };
 
 type WatchValues = Record<
@@ -153,17 +205,17 @@ const GraphNode = ({
 };
 
 export default function Meta() {
-  const [, forceUpdate] = useState();
+  const [, forceUpdate] = useState({});
   const update = () => forceUpdate({});
   const [stackState, setStackState] = useState<{
     currentEvaluation?: Evaluation;
-    callsRoot: StackFrame[];
+    callsRootImmutableRef: StackFrame[];
     stack: StackFrame[];
     allNodes: StackFrame[];
     watchValues: WatchValues;
   }>({
     stack: [],
-    callsRoot: [],
+    callsRootImmutableRef: [],
     allNodes: [],
     watchValues: {},
   });
@@ -179,6 +231,10 @@ export default function Meta() {
     next?: () => any;
     programTimers: Set<number>;
     programIntervals: Set<number>;
+    editorWidgetsByNode: Map<
+      string,
+      Map<string, HTMLElement>
+    >;
   }>({
     autoStepping: false,
     running: false,
@@ -188,20 +244,14 @@ export default function Meta() {
     nextTimer: undefined,
     programTimers: new Set(),
     programIntervals: new Set(),
+    editorWidgetsByNode: new Map(),
   });
 
-  const markEditor = (e: Evaluation) => {
-    if (!e.e.loc) return;
+  const markEditor = (evaluation: Evaluation) => {
+    const loc = astToCmLoc(evaluation.e);
+    if (!loc) return;
 
-    const start = {
-      ch: e.e.loc.start.column,
-      line: e.e.loc.start.line - 1,
-    };
-
-    const end = {
-      ch: e.e.loc.end.column,
-      line: e.e.loc.end.line - 1,
-    };
+    const { start, end } = loc;
 
     execStateRef.current.marker?.clear();
 
@@ -257,6 +307,21 @@ export default function Meta() {
     }
   };
 
+  const clear = () => {
+    execStateRef.current.editorWidgetsByNode.forEach((l) =>
+      l.forEach((n) => n.remove()),
+    );
+
+    execStateRef.current.editorWidgetsByNode = new Map();
+
+    setStackState({
+      watchValues: {},
+      stack: [],
+      allNodes: [],
+      callsRootImmutableRef: [],
+    });
+  };
+
   const startExec = () => {
     if (
       !editorRef.current ||
@@ -265,24 +330,47 @@ export default function Meta() {
       return;
     }
 
+    clear();
+
+    let allStackNodes: StackFrame[] = [];
+    let callStack: StackFrame[] = [
+      {
+        fnName: 'Program',
+        id: '-1',
+        name: '-1',
+        args: [],
+        children: [],
+        values: {},
+        hasReturned: false,
+        returnValue: undefined,
+        sourceId: 'Program!',
+      },
+    ];
+    let watchValues: WatchValues = {};
+
+    // cheating a bit here to optimize react-d3-tree rendering
+    // callsRootImmutableRef is an immutable *reference*
+    // BUT it's values mutate
+    // NOTE - it will not be reassigned if stack frame variable change
+    let callsRootImmutableRef: StackFrame[] = [];
+
     execStateRef.current.running = true;
 
     const code = editorRef.current.getDoc().getValue();
 
-    let callsRoot: StackFrame[] = [];
-    let allStackNodes: StackFrame[] = [];
-    let callStack: StackFrame[] = [];
-
-    let watchValues: WatchValues = {};
-
-    setStackState({
-      stack: [],
-      callsRoot: [],
-      allNodes: [],
-      watchValues,
-    });
-
     const prepareHooks = () => {
+      const runMetaFunction = (fn: Function) => {
+        const { e, closure, config } = getMetaFunction(fn);
+
+        evaluate(
+          { e, fn, type: 'Apply', args: [] },
+          maybeEndExec,
+          handleError,
+          closure,
+          config,
+        );
+      };
+
       return {
         clearTimeout: (timer: number) => {
           execStateRef.current.programTimers.delete(timer);
@@ -292,26 +380,15 @@ export default function Meta() {
           execStateRef.current.programIntervals.delete(
             timer,
           );
-
-          clearInterval(timer as any);
+          clearInterval(timer);
         },
         setTimeout: function (fn: () => void, ms: number) {
-          const { e, closure, config } = getMetaFunction(
-            fn,
-          );
-
-          const timer = (setTimeout as SetTimeout)(() => {
+          const timer = (setTimeout as Timeout)(() => {
             execStateRef.current.programTimers.delete(
               timer,
             );
 
-            evaluate(
-              { type: 'Apply', e, fn, args: [] },
-              maybeEndExec,
-              handleError,
-              closure,
-              config,
-            );
+            runMetaFunction(fn);
           }, ms);
 
           execStateRef.current.programTimers.add(timer);
@@ -319,18 +396,8 @@ export default function Meta() {
           return timer;
         },
         setInterval: function (fn: () => void, ms: number) {
-          const { e, closure, config } = getMetaFunction(
-            fn,
-          );
-
-          const timer = (setInterval as SetTimeout)(() => {
-            evaluate(
-              { type: 'Apply', e, fn, args: [] },
-              maybeEndExec,
-              handleError,
-              closure,
-              config,
-            );
+          const timer = (setInterval as Timeout)(() => {
+            runMetaFunction(fn);
           }, ms);
 
           execStateRef.current.programIntervals.add(timer);
@@ -342,82 +409,174 @@ export default function Meta() {
 
     // const prepareHooks = () => {
     //   return liftedAll({
-    //     setTimeout: function _setTimeout(
-    //       [fn, ms]: [() => void, number],
-    //       c: (a: any) => void,
-    //       cerr: (a: any) => void,
-    //     ) {
-    //       console.log('setTimeout', [fn, ms], c, cerr);
-
-    //       const timer = setTimeout(() => {
-    //         execStateRef.current.programTimers.delete(
-    //           timer,
-    //         );
-    //         const { e, closure, config } = getMetaFunction(
-    //           fn,
-    //         );
-    //         console.log(e);
-    //         CallExpression(
-    //           { callee: e.id, arguments: [] },
-    //           c,
-    //           cerr,
-    //           closure,
-    //           config,
-    //         );
-    //       }, ms);
-
-    //       execStateRef.current.programTimers.add(timer);
-    //     },
     //   });
     // };
 
-    const updateStackState = (e: Evaluation) => {
-      const fnName =
-        e.e?.e?.callee?.name || e.e?.e?.id?.name;
+    const Val = ({ value }: { value: string }) => (
+      <div
+        style={{
+          marginLeft: 8,
+          fontStyle: 'italic',
+          borderRadius: '4px',
+          color: 'pink',
+        }}
+      >
+        {value}
+      </div>
+    );
 
-      if (fnName && e.e.type === 'Apply') {
-        if (e.phase === 'enter') {
+    const addValueToEditor = (
+      node: ASTNode,
+      value: any,
+    ) => {
+      if (!callStack.length || !editorRef.current) return;
+
+      const loc = astToCmLoc(node);
+      if (!loc) return;
+
+      const frame = callStack[callStack.length - 1];
+      const key = (node.range ?? []).join();
+
+      const { line } = loc.start;
+      const ch =
+        editorRef.current?.lineInfo(line)?.text?.length ??
+        0;
+
+      const el = document.createElement('div');
+      render(<Val value={value} />, el);
+
+      // @ts-ignore
+      addWidget(
+        editorRef.current,
+        { line: line, ch: ch },
+        el,
+      );
+
+      execStateRef.current.editorWidgetsByNode
+        .get(frame.sourceId)
+        ?.get(key)
+        ?.remove();
+
+      execStateRef.current.editorWidgetsByNode
+        .get(frame.sourceId)
+        ?.set(key, el);
+
+      return el;
+    };
+
+    const updateStackState = (evaluation: Evaluation) => {
+      const fnName =
+        evaluation.e?.e?.callee?.name ||
+        evaluation.e?.e?.id?.name;
+
+      if (
+        evaluation.phase === 'exit' &&
+        evaluation.e.type === 'AssignmentExpression'
+      ) {
+        addValueToEditor(
+          evaluation.e,
+          `= ${evaluation.value}`,
+        );
+      }
+
+      if (
+        evaluation.phase === 'exit' &&
+        evaluation.e.type === 'VariableDeclarator'
+      ) {
+        addValueToEditor(
+          evaluation.e.id,
+          `= ${evaluation.value}`,
+        );
+      }
+
+      if (
+        evaluation.phase === 'exit' &&
+        evaluation.e.type === 'ReturnStatement'
+      ) {
+        addValueToEditor(
+          evaluation.e,
+          `⇐ ${evaluation.value.value}`,
+        );
+      }
+
+      if (fnName && evaluation.e.type === 'Apply') {
+        const metaFn = getMetaFunction(evaluation.e.fn).e;
+        if (evaluation.phase === 'enter') {
           const id = `${allStackNodes.length}`;
           const frame: StackFrame = {
             fnName,
             id,
             name: id,
-            args: e.e.args,
+            args: evaluation.e.args,
             children: [],
             values: {},
             hasReturned: false,
             returnValue: undefined,
+            sourceId: metaFn.range.join(),
           };
 
           (callStack.length
             ? callStack[callStack.length - 1].children
-            : callsRoot
+            : callsRootImmutableRef
           ).push(frame);
 
           callStack.push(frame);
           allStackNodes.push(frame);
+          callsRootImmutableRef = [
+            ...callsRootImmutableRef,
+          ];
+
+          const nodes = execStateRef.current.editorWidgetsByNode.get(
+            frame.sourceId,
+          );
+
+          nodes?.forEach((node) => node.remove());
+
+          execStateRef.current.editorWidgetsByNode.set(
+            frame.sourceId,
+            new Map(),
+          );
+
+          addValueToEditor(
+            metaFn,
+            `( ${evaluation.e.args.join(', ')} )`,
+          );
         } else {
           if (callStack.length) {
-            callStack[
-              callStack.length - 1
-            ].hasReturned = true;
+            const frame = callStack[callStack.length - 1];
 
-            callStack[callStack.length - 1].returnValue =
-              e.value;
+            frame.hasReturned = true;
+            frame.returnValue = evaluation.value;
+
+            addValueToEditor(
+              metaFn,
+              `( ${evaluation.e.args.join(', ')} ) => ${
+                frame.returnValue
+              }`,
+            );
           }
 
           callStack.pop();
+          callsRootImmutableRef = [
+            ...callsRootImmutableRef,
+          ];
         }
       } else {
-        if (callStack.length) {
-          callStack[callStack.length - 1].values =
-            e.env?.values ?? {};
+        const frame = callStack[callStack.length - 1];
+        if (frame.id === '-1') {
+          const values = omit(
+            evaluation.env?.values ?? {},
+            programEnvKeys,
+          );
+
+          frame.values = values;
+        } else {
+          frame.values = evaluation.env?.values ?? {};
         }
       }
 
       setStackState({
-        currentEvaluation: e,
-        callsRoot,
+        callsRootImmutableRef,
         allNodes: allStackNodes,
         stack: callStack,
         watchValues,
@@ -434,7 +593,7 @@ export default function Meta() {
 
       for (const name of names) {
         map[name] = (
-          e: JavaScriptASTNode,
+          node: JavaScriptASTNode,
           c: Continuation,
           cerr: ErrorContinuation,
           env: Environment,
@@ -446,11 +605,11 @@ export default function Meta() {
               name
             ] as any;
 
-            f(e, c, cerr, env, config);
+            f(node, c, cerr, env, config);
           };
 
           // HACK: Program statements (not interesting) are handled as BlockStatements by the interpreter
-          if (e.type === 'Program') {
+          if (node.type === 'Program') {
             next();
             return;
           }
@@ -462,7 +621,7 @@ export default function Meta() {
               }
             };
 
-            execStateRef.current.nextTimer = (setTimeout as SetTimeout)(
+            execStateRef.current.nextTimer = (setTimeout as Timeout)(
               run,
               execStateRef.current.speed,
             );
@@ -475,14 +634,18 @@ export default function Meta() {
       return map;
     };
 
+    const programEnv = {
+      ...prepareHooks(),
+      ...globalObjects,
+    };
+
+    const programEnvKeys = Object.keys(programEnv);
+
     metaesEval(
       code,
       maybeEndExec,
       handleError,
-      {
-        ...prepareHooks(),
-        ...globalObjs,
-      },
+      programEnv,
       {
         interpreters: {
           prev: ECMAScriptInterpreters,
@@ -550,100 +713,65 @@ export default function Meta() {
     update();
   };
 
-  const callGraphEl = (
-    <div key="graph">
-      <h2>The Call Graph</h2>
-      <div
-        style={{
-          height: '300px',
-          border: '1px lightgray solid',
-          borderRadius: 4,
-        }}
-      >
-        {stackState.callsRoot.length ? (
-          <Tree
-            translate={{ x: 100, y: 100 }}
-            zoom={0.5}
-            orientation="vertical"
-            transitionDuration={0}
-            collapsible={false}
-            data={[
-              {
-                id: 'Program',
-                name: 'Program',
-                fnName: 'Program',
-                args: [],
-                values: {},
-                children: [...stackState.callsRoot],
-              } as any,
-            ]}
-            allowForeignObjects
-            nodeLabelComponent={{
-              foreignObjectWrapper: {
-                y: 24,
-              },
-              render: <GraphNode />,
-            }}
-          />
-        ) : null}
-      </div>
-    </div>
-  );
+  function valueTable() {
+    const indexerName = 'Input';
+    const valueName = 'Fibonacci';
 
-  const fibVals: number[] = [];
-  for (const x of stackState.allNodes) {
-    fibVals[x.args[0]] =
-      fibVals[x.args[0]] ?? x.returnValue;
+    const tableValues: number[] = [];
+    for (const x of stackState.allNodes) {
+      tableValues[x.args[0]] =
+        tableValues[x.args[0]] ?? x.returnValue;
+    }
+
+    const filledArr = Array(tableValues.length).fill(null);
+
+    return (
+      <div key="table" className="space">
+        <h2>Values</h2>
+        <div
+          style={{
+            overflow: 'scroll',
+            border: '1px lightgray solid',
+            borderRadius: 4,
+            padding: 12,
+          }}
+        >
+          <table>
+            <tbody>
+              <tr>
+                <th
+                  scope="row"
+                  align="left"
+                  style={{ padding: 4 }}
+                >
+                  {indexerName}
+                </th>
+                {filledArr.map((n, i) => (
+                  <td key={i} style={{ padding: 4 }}>
+                    {i}
+                  </td>
+                ))}
+              </tr>
+              <tr>
+                <th
+                  scope="row"
+                  align="left"
+                  style={{ padding: 4 }}
+                >
+                  {valueName}
+                </th>
+                {filledArr.map((n, i) => (
+                  <td key={i} style={{ padding: 4 }}>
+                    {tableValues[i]}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
   }
-
-  const filledArr = Array(fibVals.length).fill(null);
-
-  const valueTable = (
-    <div key="table" className="space">
-      <h2>Values</h2>
-      <div
-        style={{
-          overflow: 'scroll',
-          border: '1px lightgray solid',
-          borderRadius: 4,
-          padding: 12,
-        }}
-      >
-        <table>
-          <tbody>
-            <tr>
-              <th
-                scope="row"
-                align="left"
-                style={{ padding: 4 }}
-              >
-                Index
-              </th>
-              {filledArr.map((n, i) => (
-                <td key={i} style={{ padding: 4 }}>
-                  {i}
-                </td>
-              ))}
-            </tr>
-            <tr>
-              <th
-                scope="row"
-                align="left"
-                style={{ padding: 4 }}
-              >
-                Fibonacci
-              </th>
-              {filledArr.map((n, i) => (
-                <td key={i} style={{ padding: 4 }}>
-                  {fibVals[i]}
-                </td>
-              ))}
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
 
   const callStackEl = (
     <div key="stack">
@@ -722,6 +850,37 @@ export default function Meta() {
     </div>
   );
 
+  const callGraphEl = (
+    <div key="graph">
+      <h2>The Call Graph</h2>
+      <div
+        style={{
+          height: '300px',
+          border: '1px lightgray solid',
+          borderRadius: 4,
+        }}
+      >
+        {stackState.callsRootImmutableRef.length ? (
+          <Tree
+            translate={{ x: 100, y: 100 }}
+            zoom={0.5}
+            orientation="vertical"
+            transitionDuration={0}
+            collapsible={false}
+            data={stackState.callsRootImmutableRef}
+            allowForeignObjects
+            nodeLabelComponent={{
+              foreignObjectWrapper: {
+                y: 24,
+              },
+              render: <GraphNode />,
+            }}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ margin: '0 auto', maxWidth: 840 }}>
       <h1>Ch 1: The Fibonacci Sequence</h1>
@@ -731,9 +890,9 @@ export default function Meta() {
           className="space-small"
         >
           <CodeEditor
-            editorDidMount={(editor) =>
-              (editorRef.current = editor)
-            }
+            editorDidMount={(editor) => {
+              return (editorRef.current = editor);
+            }}
             value={code}
             options={{
               readOnly: execStateRef.current.running,
@@ -794,7 +953,7 @@ export default function Meta() {
           />
         </div>
       </div>
-      <div>{valueTable}</div>
+      {/* <div>{valueTable()}</div> */}
       <div
         key="data"
         className="space"
@@ -805,7 +964,7 @@ export default function Meta() {
         }}
       >
         {callStackEl}
-        {callGraphEl}
+        {/* {callGraphEl} */}
       </div>
     </div>
   );
@@ -813,3 +972,18 @@ export default function Meta() {
 
 // @ts-ignore
 Meta.layout = null;
+
+function astToCmLoc(e: ASTNode) {
+  if (!e.loc) return;
+
+  const start = {
+    ch: e.loc.start.column,
+    line: e.loc.start.line - 1,
+  };
+
+  const end = {
+    ch: e.loc.end.column,
+    line: e.loc.end.line - 1,
+  };
+  return { start, end };
+}

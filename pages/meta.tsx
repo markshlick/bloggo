@@ -688,7 +688,6 @@ export default function Meta() {
 
   return (
     <div style={{ margin: '0 auto', maxWidth: 840 }}>
-      <h1>Ch 1: The Fibonacci Sequence</h1>
       <div key="editor" className="space">
         <div
           style={{ height: '30vh', minHeight: 320 }}

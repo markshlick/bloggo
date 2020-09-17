@@ -16,7 +16,35 @@ import omit from 'lodash/omit';
 
 type Timeout = (fn: () => void, ms: number) => number;
 
+const blockScopeTypes = [
+  'IfStatement',
+  'ForStatement',
+  'ForInStatement',
+  'ForOfStatement',
+  'WhileStatement',
+] as const;
+
+const prettyBlockScopeTypeNames: {
+  [name in typeof blockScopeTypes[number]]: string;
+} = {
+  IfStatement: 'if { }',
+  ForStatement: 'for { }',
+  ForInStatement: 'for { in }',
+  ForOfStatement: 'for { of }',
+  WhileStatement: 'while { }',
+};
+
+export type BlockFrame = {
+  id: string;
+  type: typeof blockScopeTypes;
+  sourceId?: string;
+  allBlocks: BlockFrame[];
+  calls: StackFrame[];
+  children: (BlockFrame | StackFrame)[];
+};
+
 export type StackFrame = {
+  children: (BlockFrame | StackFrame)[];
   id: string;
   name: string;
   fnName: string;
@@ -25,9 +53,11 @@ export type StackFrame = {
     [key: string]: any;
   };
   returnValue: any;
-  children: StackFrame[];
+  calls: StackFrame[];
   hasReturned: boolean;
   sourceId: string;
+  blockStack: BlockFrame[];
+  allBlocks: BlockFrame[];
 };
 
 export type WatchValues = Record<
@@ -36,19 +66,19 @@ export type WatchValues = Record<
 >;
 
 export const interestingTypes: NodeNames[] = [
-  'ReturnStatement',
-  'AssignmentPattern',
-  'AssignmentExpression',
-  'VariableDeclaration',
   'CallExpression',
+  'AssignmentExpression',
+  'ReturnStatement',
+  'VariableDeclaration',
   'ExpressionStatement',
+  'ConditionalExpression',
+  'UpdateExpression',
+  //
   'IfStatement',
   'ForStatement',
   'ForInStatement',
   'ForOfStatement',
   'WhileStatement',
-  'ConditionalExpression',
-  'UpdateExpression',
 ];
 
 const globalObjects = {
@@ -75,16 +105,19 @@ const globalObjects = {
 
 type NodeNames = keyof typeof ECMAScriptInterpreters.values;
 
-const programFrame = () => ({
+const programFrame = (): StackFrame => ({
   fnName: 'Program',
   id: '-1',
   name: '-1',
   args: [],
+  calls: [],
   children: [],
   values: {},
   hasReturned: false,
   returnValue: undefined,
   sourceId: 'Program!',
+  allBlocks: [],
+  blockStack: [],
 });
 
 const elog = (evaluation: Evaluation) => {
@@ -153,8 +186,9 @@ export function meta({
     programEnvKeys: [],
     callbackQueue: [],
     callStack: [],
-    callsRootImmutableRef: [],
     allStackNodes: [],
+    // TODO: move this outside of this component
+    callsRootImmutableRef: [],
   };
 
   const currentFrame = () =>
@@ -261,8 +295,51 @@ export function meta({
     return map;
   };
 
+  const currentBlock = () => {
+    const frame = currentFrame();
+    return frame.blockStack[frame.blockStack.length - 1];
+  };
+
   const updateStackState = (evaluation: Evaluation) => {
-    elog(evaluation);
+    // elog(evaluation);
+
+    const evaluationType = evaluation.e.type;
+    if (blockScopeTypes.includes(evaluationType)) {
+      const stackFrame = currentFrame();
+      if (evaluation.phase === 'enter') {
+        const blockFrame = {
+          // @ts-ignore
+          fnName: prettyBlockScopeTypeNames[evaluationType],
+          id: `${stackFrame.id}-${stackFrame.allBlocks.length}`,
+          type: evaluation.e.type,
+          sourceId: evaluation.e.range?.join(),
+          allBlocks: [],
+          calls: [],
+          children: [],
+        };
+
+        const currentBlock =
+          stackFrame.blockStack[
+            stackFrame.blockStack.length - 1
+          ];
+
+        if (!currentBlock) {
+          stackFrame.allBlocks.push(blockFrame);
+          stackFrame.children.push(blockFrame);
+        } else {
+          currentBlock.allBlocks.push(blockFrame);
+          currentBlock.children.push(blockFrame);
+        }
+
+        execState.callsRootImmutableRef = [
+          ...execState.callsRootImmutableRef,
+        ];
+
+        stackFrame.blockStack.push(blockFrame);
+      } else {
+        stackFrame.blockStack.pop();
+      }
+    }
 
     const fnName =
       evaluation.e?.e?.callee?.name ||
@@ -272,19 +349,26 @@ export function meta({
       if (evaluation.phase === 'enter') {
         const metaFn = getMetaFunction(evaluation.e.fn)?.e;
         const id = `${execState.allStackNodes.length}`;
-        const frame: StackFrame = {
+        const frame = {
           fnName,
           id,
           name: id,
           args: evaluation.e.args,
+          calls: [],
+          allBlocks: [],
           children: [],
+          blockStack: [],
           values: {},
           hasReturned: false,
           returnValue: undefined,
           sourceId: metaFn?.range?.join(),
         };
 
-        currentFrame().children.push(frame);
+        currentFrame().calls.push(frame);
+        currentBlock()?.calls.push(frame);
+        (currentBlock() || currentFrame())?.children.push(
+          frame,
+        );
 
         execState.callStack.push(frame);
         execState.allStackNodes.push(frame);

@@ -125,20 +125,28 @@ function y(a) {
 }
 
 function x(n) {
-  let s = 0;
+
   for (let i = 0; i <= 3; i++) {
-    s = i;
+    for (let i2 = 0; i2 <= 3; i2++) {
+      if (i && i2) {
+        console.log(i, i2);
+      }
+    }
   }
+  // let s = 0;
+  // for (let i = 0; i <= 3; i++) {
+  //   s = i;
+  // }
   
-  let a;
-  a = 1;
+  // let a;
+  // a = 1;
 
-  const b = y(2);
+  // const b = y(2);
 
-  return a + b + y(3) + n;
+  // return a + b + y(3) + n;
 }
 
-const r = y(4);
+const r = x(4);
 `;
 
 const EditorValue = ({ value }: { value: string }) => (
@@ -163,8 +171,11 @@ const GraphNode = ({
     <div>
       {nodeData ? (
         <strong>
-          {nodeData?.fnName}(
-          {nodeData ? formatArgs(nodeData?.args) : ''})
+          {nodeData?.fnName}
+          {nodeData?.args
+            ? `(${formatArgs(nodeData?.args)})`
+            : ''}
+
           {/* {' => '}
         {nodeData?.hasReturned
           ? nodeData?.returnValue

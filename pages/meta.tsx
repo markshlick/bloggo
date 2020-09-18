@@ -10,7 +10,12 @@ import { Evaluation, ASTNode } from 'metaes/types';
 import { getMetaFunction } from 'metaes/metafunction';
 
 import dynamic from 'next/dynamic';
-import { TextMarker, Editor, Position } from 'codemirror';
+import {
+  TextMarker,
+  Editor,
+  Position,
+  LineWidget,
+} from 'codemirror';
 
 import isFunction from 'lodash/isFunction';
 import isObject from 'lodash/isObject';
@@ -192,6 +197,7 @@ function useEditorState() {
       string,
       Map<string, HTMLElement>
     >;
+    lineWidget?: LineWidget;
   }>({
     marker: undefined,
     editorWidgetsByNode: new Map(),

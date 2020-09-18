@@ -16,13 +16,13 @@ type Visitor<T> = (
   cerr: ErrorContinuation,
 ) => void;
 
-export const visitAttributes = <T>(
+export const visitAttributes = <T extends ASTNode>(
   items: T[],
   fn: Visitor<T>,
   c: Continuation,
   cerr: ErrorContinuation,
-  env,
-  config,
+  env: Environment<any>,
+  config: EvaluationConfig,
 ) => {
   if (items.length === 0) {
     c([]);
@@ -46,18 +46,21 @@ export const visitAttributes = <T>(
     let done = true;
 
     // Simple `loop` function executor, just loop over arguments until nothing is left.
-    function execute() {
+    const execute = function () {
       done = false;
       while (tasks.length) {
         // @ts-ignore
         loop(...tasks.shift());
       }
       done = true;
-    }
+    };
 
     // const visited = new Set();
 
-    function loop(index, accumulated: {}) {
+    const loop = function (
+      index: number,
+      accumulated: { [name: string]: any },
+    ) {
       if (index < items.length) {
         const item = items[index];
 
@@ -68,7 +71,7 @@ export const visitAttributes = <T>(
             ? item.value.expression
             : item.value;
 
-        const next = (value) => {
+        const next = (value: any) => {
           // // If true, it means currently may be happening for example a reevaluation of items
           // // from certain index using call/cc. Copy accumulated previously results and ignore their tail
           // // after given index as this reevalution may happen in the middle of an array.
@@ -93,7 +96,7 @@ export const visitAttributes = <T>(
       } else {
         c(accumulated);
       }
-    }
+    };
 
     // start
     loop(0, {});
@@ -142,7 +145,19 @@ export const evaluateChildren = (
   );
 
 const jsxInterpreters = {
-  JSXElement: (e, c, cerr, env, config) => {
+  JSXElement: (
+    e: {
+      openingElement: {
+        name: { name: string };
+        attributes: any;
+      };
+      children: any[];
+    },
+    c: Continuation,
+    cerr: ErrorContinuation,
+    env: Environment,
+    config: EvaluationConfig,
+  ) => {
     evaluateAttributes(
       e.openingElement.attributes,
       (attributes) =>

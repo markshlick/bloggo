@@ -1,5 +1,4 @@
 import { evaluate, visitArray } from 'metaes/evaluate';
-import { Literal } from 'metaes/interpreter/base';
 import {
   ASTNode,
   Continuation,

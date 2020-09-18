@@ -23,6 +23,7 @@ import {
   WatchValues,
   interestingTypes,
 } from 'helpers/meta';
+
 import {
   formatArgs,
   formatValue,
@@ -61,29 +62,45 @@ function astToCmLoc(e: ASTNode) {
   return { start, end };
 }
 
-function addWidget(
+type Widget = {
+  node: ASTNode;
+  attach: () => void;
+  remove: () => void;
+};
+
+function createWidget(
+  node: ASTNode,
+  frame: StackFrame,
   cm: Editor,
   p: Position,
   el: ReactElement,
-) {
-  const pos = cm.charCoords(p, 'local');
+): Widget {
+  const display = () => {
+    const element = document.createElement('div');
 
-  const top = pos.top;
-  const right = pos.right;
-  const node = document.createElement('div');
+    const pos = cm.charCoords(p, 'local');
+    const top = pos.top;
+    const right = pos.right;
 
-  render(el, node);
+    element.style.position = 'absolute';
+    element.setAttribute('cm-ignore-events', 'true');
+    element.style.top = top + 'px';
+    element.style.left = right + 'px';
 
-  node.style.position = 'absolute';
-  node.setAttribute('cm-ignore-events', 'true');
-  node.style.top = top + 'px';
-  node.style.left = right + 'px';
-  // @ts-ignore
-  cm.display.input.setUneditable(node);
-  // @ts-ignore
-  cm.display.sizer.appendChild(node);
+    return {
+      node,
+      attach: () => {
+        render(el, element);
+        // @ts-ignore
+        cm.display.input.setUneditable(element);
+        // @ts-ignore
+        cm.display.sizer.appendChild(element);
+      },
+      remove: () => element.remove(),
+    };
+  };
 
-  return node;
+  return display();
 }
 
 let code: string;
@@ -100,20 +117,20 @@ let a;
 a = z;
 `;
 
-// code = `// psst: you can edit me!
-// function fibonacci(num) {
-//   if (num < 0) return null;
-//   if (num <= 1) return num;
+code = `// psst: you can edit me!
+function fibonacci(num) {
+  if (num < 0) return null;
+  if (num <= 1) return num;
 
-//   const f1 = fibonacci(num - 1);
-//   const f2 = fibonacci(num - 2);
-//   const result = f1 + f2;
+  const f1 = fibonacci(num - 1);
+  const f2 = fibonacci(num - 2);
+  const result = f1 + f2;
 
-//   return result;
-// }
+  return result;
+}
 
-// const r = fibonacci(4);
-// `;
+const r = fibonacci(2);
+`;
 
 // code = `
 // function x(z) {
@@ -178,10 +195,7 @@ function useEditorState() {
 
   const editorItemsRef = useRef<{
     marker?: TextMarker;
-    editorWidgetsByFrame: Map<
-      string,
-      Map<string, HTMLElement>
-    >;
+    editorWidgetsByFrame: Map<string, Map<string, Widget>>;
     commentLineWidget?: LineWidget;
     reactLineWidget?: LineWidget;
   }>({
@@ -226,13 +240,13 @@ function useEditorState() {
 
   const getFrameWidgets = (frame: StackFrame) => {
     let frameWidgets = editorItemsRef.current.editorWidgetsByFrame.get(
-      frame.sourceId,
+      frame.id,
     );
 
     if (!frameWidgets) {
       frameWidgets = new Map();
       editorItemsRef.current.editorWidgetsByFrame.set(
-        frame.sourceId,
+        frame.id,
         frameWidgets,
       );
     }
@@ -372,11 +386,15 @@ function useEditorState() {
       editorRef.current?.lineInfo(line)?.text?.length ?? 0;
 
     // @ts-ignore
-    const el = addWidget(
+    const el = createWidget(
+      node,
+      frame,
       editorRef.current,
       { line: line, ch: ch },
       <EditorValue value={value} />,
     );
+
+    el.attach();
 
     const frameWidgets = getFrameWidgets(frame);
     frameWidgets.get(key)?.remove();
@@ -452,7 +470,7 @@ function useEditorState() {
       displayValueInEditor(
         evaluation.e,
         frame,
-        `⇐ ${formatValue(evaluation.value)}`,
+        `⇐ ${formatValue(evaluation.value.value)}`,
       );
     }
 
@@ -461,7 +479,7 @@ function useEditorState() {
       evaluation.e.type === 'Program'
     ) {
       editorItemsRef.current.editorWidgetsByFrame.set(
-        frame.sourceId,
+        frame.id,
         new Map(),
       );
     }
@@ -478,20 +496,14 @@ function useEditorState() {
   const displayApplyEnter = (
     evaluation: Evaluation,
     frame: StackFrame,
+    prevFrame: StackFrame,
   ) => {
-    const metaFn = getMetaFunction(evaluation.e.fn)?.e;
-    if (!metaFn) return;
-
-    const nodes = editorItemsRef.current.editorWidgetsByFrame.get(
-      frame.sourceId,
-    );
-
+    editorItemsRef.current.commentLineWidget?.clear();
+    const nodes = getFrameWidgets(prevFrame);
     nodes?.forEach((node) => node.remove());
 
-    editorItemsRef.current.editorWidgetsByFrame.set(
-      frame.sourceId,
-      new Map(),
-    );
+    const metaFn = getMetaFunction(evaluation.e.fn)?.e;
+    if (!metaFn) return;
 
     displayComments(metaFn);
 
@@ -507,20 +519,24 @@ function useEditorState() {
   const displayApplyExit = (
     evaluation: Evaluation,
     frame: StackFrame,
+    prevFrame: StackFrame,
   ) => {
+    editorItemsRef.current.commentLineWidget?.clear();
+    const nodes = getFrameWidgets(frame);
+    nodes?.forEach((node) => node.remove());
+    editorItemsRef.current.editorWidgetsByFrame.set(
+      frame.id,
+      new Map(),
+    );
+
     const metaFn = getMetaFunction(evaluation.e.fn)?.e;
     if (!metaFn) return;
 
     frame.hasReturned = true;
     frame.returnValue = evaluation.value;
 
-    displayValueInEditor(
-      metaFn,
-      frame,
-      `( ${evaluation.e.args.join(', ')} ) => ${formatValue(
-        frame.returnValue,
-      )}`,
-    );
+    const prevNodes = getFrameWidgets(prevFrame);
+    prevNodes?.forEach((node) => node.attach());
   };
 
   const clearCurrentMarker = () => {
@@ -928,8 +944,6 @@ export default function Meta() {
         {callStackEl}
         {callGraphEl}
       </div>
-
-      {/* {el && createPortal(el, node)} */}
     </div>
   );
 }

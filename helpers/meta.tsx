@@ -13,8 +13,8 @@ import { getMetaFunction } from 'metaes/metafunction';
 import { evaluate } from 'metaes/evaluate';
 import { liftedAll } from 'metaes/callcc';
 import omit from 'lodash/omit';
-import jsxInterpreters from './jsxInterpreters';
-import { parseAndEvaluate } from './evaluate';
+import jsxInterpreters from 'helpers/jsxInterpreters';
+import { parseAndEvaluate } from 'helpers/evaluate';
 
 type Timeout = (fn: () => void, ms: number) => number;
 
@@ -165,10 +165,12 @@ export function meta({
   displayApplyEnter: (
     evaluation: Evaluation,
     frame: StackFrame,
+    prevFrame: StackFrame,
   ) => void;
   displayApplyExit: (
     evaluation: Evaluation,
     frame: StackFrame,
+    prevFrame: StackFrame,
   ) => void;
   displayEvaluation: (
     evaluation: Evaluation,
@@ -196,6 +198,9 @@ export function meta({
 
   const currentFrame = () =>
     execState.callStack[execState.callStack.length - 1];
+
+  const prevFrame = () =>
+    execState.callStack[execState.callStack.length - 2];
 
   const makeHooks = () => {
     const runMetaFunction = (fn: Function) => {
@@ -420,9 +425,13 @@ export function meta({
           ...execState.callsRootImmutableRef,
         ];
 
-        displayApplyEnter(evaluation, frame);
+        displayApplyEnter(evaluation, frame, prevFrame());
       } else {
-        displayApplyExit(evaluation, currentFrame());
+        displayApplyExit(
+          evaluation,
+          currentFrame(),
+          prevFrame(),
+        );
         execState.callStack.pop();
         execState.callsRootImmutableRef = [
           ...execState.callsRootImmutableRef,

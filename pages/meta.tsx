@@ -123,7 +123,9 @@ function formatArgs(args: any[]) {
   return args.map((arg) => formatValue(arg)).join(', ');
 }
 
-const code = `// psst: you can edit me!
+let code: string;
+
+code = `// psst: you can edit me!
 const X = (props) => (
   <h1 style={{ color: 'red' }}>Hello {props.name}!</h1>
 );
@@ -133,20 +135,20 @@ const z = <div style={{ backgroundColor: 'pink' }}>{x}</div>;
 const a = 1;
 `;
 
-// const code = `// psst: you can edit me!
-// function fibonacci(num) {
-//   if (num < 0) return null;
-//   if (num <= 1) return num;
+code = `// psst: you can edit me!
+function fibonacci(num) {
+  if (num < 0) return null;
+  if (num <= 1) return num;
 
-//   const f1 = fibonacci(num - 1);
-//   const f2 = fibonacci(num - 2);
-//   const result = f1 + f2;
+  const f1 = fibonacci(num - 1);
+  const f2 = fibonacci(num - 2);
+  const result = f1 + f2;
 
-//   return result;
-// }
+  return result;
+}
 
-// const r = fibonacci(4);
-// `;
+const r = fibonacci(4);
+`;
 
 const EditorValue = ({ value }: { value: string }) => (
   <div
@@ -429,7 +431,11 @@ function useEditorState() {
         `= ${formatValue(evaluation.value)}`,
       );
 
-      if (isValidElement(evaluation.value)) {
+      if (
+        // @ts-ignore
+        window.featureFlags?.displayReact &&
+        isValidElement(evaluation.value)
+      ) {
         displayReactElementValue(
           evaluation.e,
           evaluation.value,

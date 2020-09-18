@@ -37,7 +37,6 @@
     "react-flow-renderer": "^5.9.1",
     "react-live": "^2.2.2",
     "react-modal": "^3.11.2",
-    "react-player": "^2.3.1",
     "rehype-waves": "^0.1.6",
     "rss": "^1.2.2",
     "shell-quote": "^1.7.2",
@@ -45,10 +44,8 @@
     "stripe": "^8.56.0",
     "swr": "^0.2.3",
     "theme-ui": "^0.2.41",
-    "use-debounce": "^3.4.2",
     "use-spring": "^0.2.3",
-    "vanillinjs": "^0.4.0",
-    "webrtc-adapter": "^7.6.2"
+    "vanillinjs": "^0.4.0"
   },
   "devDependencies": {
     "@types/node": "^14.0.1",

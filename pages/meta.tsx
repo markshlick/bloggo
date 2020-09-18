@@ -17,18 +17,16 @@ import {
   LineWidget,
 } from 'codemirror';
 
-import isFunction from 'lodash/isFunction';
-import isObject from 'lodash/isObject';
-import isString from 'lodash/isString';
-import isDate from 'lodash/isDate';
-import isArray from 'lodash/isArray';
-
 import {
   meta,
   StackFrame,
   WatchValues,
   interestingTypes,
 } from 'helpers/meta';
+import {
+  formatArgs,
+  formatValue,
+} from 'helpers/formatValue';
 
 const CodeEditor = dynamic(
   import('components/CodeEditor'),
@@ -88,67 +86,51 @@ function addWidget(
   return node;
 }
 
-function formatValue(arg: any): string {
-  if (isFunction(arg)) {
-    return `fn()`;
-  } else if (isValidElement(arg)) {
-    return `<${
-      isString(arg.type) && arg.type.length
-        ? arg.type
-        : 'ReactElement'
-    }>`;
-  } else if (isArray(arg)) {
-    return isArray(arg[0])
-      ? `[...]`
-      : `[${formatValue(arg[0])}${
-          arg.length > 1 ? ', ...' : ''
-        }]`;
-  } else if (isObject(arg)) {
-    const keys = Object.keys(arg);
-    return `${
-      arg.constructor.name === 'Object'
-        ? ''
-        : arg.constructor.name
-    }{${keys.join(', ')}}`;
-  } else if (isDate(arg)) {
-    return `Date{${arg.toISOString()}}`;
-  } else if (isString(arg)) {
-    return `"${arg}"`;
-  } else {
-    return arg;
-  }
-}
-
-function formatArgs(args: any[]) {
-  return args.map((arg) => formatValue(arg)).join(', ');
-}
-
 let code: string;
 
 code = `// psst: you can edit me!
 const X = (props) => (
-  <h1 style={{ color: 'red' }}>Hello {props.name}!</h1>
+  <h1 style={{ color: 'red', margin: 0 }}>Hello {props.name}!</h1>
 );
+
 const x = <X name="world" />;
-const z = <div style={{ backgroundColor: 'pink' }}>{x}</div>;
+const z = <div style={{ backgroundColor: 'pink', padding: 10 }}>{x}</div>;
 
-const a = 1;
+let a;
+a = z;
 `;
 
-code = `// psst: you can edit me!
-function fibonacci(num) {
-  if (num < 0) return null;
-  if (num <= 1) return num;
+// code = `// psst: you can edit me!
+// function fibonacci(num) {
+//   if (num < 0) return null;
+//   if (num <= 1) return num;
 
-  const f1 = fibonacci(num - 1);
-  const f2 = fibonacci(num - 2);
-  const result = f1 + f2;
+//   const f1 = fibonacci(num - 1);
+//   const f2 = fibonacci(num - 2);
+//   const result = f1 + f2;
 
-  return result;
-}
+//   return result;
+// }
 
-const r = fibonacci(4);
-`;
+// const r = fibonacci(4);
+// `;
+
+// code = `
+// function x(z) {
+//   let a;
+//   const array = [1, 2, 3];
+//   for (let index = 0; index < array.length; index++) {
+//     const element = array[index];
+//     for (let index2 = 0; index2 < array.length; index2++) {
+//       const element2 = array[index2];
+//       a = element + element2;
+//       console.log(a);
+//     }
+//   }
+// }
+
+// x();
+// `;
 
 const EditorValue = ({ value }: { value: string }) => (
   <div
@@ -196,14 +178,15 @@ function useEditorState() {
 
   const editorItemsRef = useRef<{
     marker?: TextMarker;
-    editorWidgetsByNode: Map<
+    editorWidgetsByFrame: Map<
       string,
       Map<string, HTMLElement>
     >;
-    lineWidget?: LineWidget;
+    commentLineWidget?: LineWidget;
+    reactLineWidget?: LineWidget;
   }>({
     marker: undefined,
-    editorWidgetsByNode: new Map(),
+    editorWidgetsByFrame: new Map(),
   });
 
   const configEditor = (editor: Editor) => {
@@ -242,13 +225,13 @@ function useEditorState() {
   };
 
   const getFrameWidgets = (frame: StackFrame) => {
-    let frameWidgets = editorItemsRef.current.editorWidgetsByNode.get(
+    let frameWidgets = editorItemsRef.current.editorWidgetsByFrame.get(
       frame.sourceId,
     );
 
     if (!frameWidgets) {
       frameWidgets = new Map();
-      editorItemsRef.current.editorWidgetsByNode.set(
+      editorItemsRef.current.editorWidgetsByFrame.set(
         frame.sourceId,
         frameWidgets,
       );
@@ -269,14 +252,15 @@ function useEditorState() {
 
     const l = document.createElement('div');
 
-    // editorItemsRef.current.lineWidget?.clear();
+    editorItemsRef.current.reactLineWidget?.clear();
 
     const lineWidget = editorRef.current?.addLineWidget(
       line,
       l,
       {
         coverGutter: true,
-        handleMouseEvents: true,
+        insertAt: 0,
+        // handleMouseEvents: true,
         // above: true,
       },
     );
@@ -284,8 +268,8 @@ function useEditorState() {
     render(
       <div
         style={{
-          padding: '18px 36px',
-          backgroundColor: '#222',
+          padding: '18px 36px 18px 36px',
+          backgroundColor: `#111`,
           fontSize: '13px',
           fontFamily: 'sans-serif',
         }}
@@ -304,7 +288,7 @@ function useEditorState() {
       l,
     );
 
-    // editorItemsRef.current.lineWidget = lineWidget;
+    editorItemsRef.current.reactLineWidget = lineWidget;
 
     //
 
@@ -337,11 +321,12 @@ function useEditorState() {
     l.style.maxHeight = '300px';
     l.style.fontFamily = 'sans-serif';
     l.style.fontSize = '13px';
-    l.style.backgroundColor = '#111';
+    l.style.background = `linear-gradient(#111, #222)`;
     l.style.color = '#eee';
     l.style.overflow = 'scroll';
 
-    editorItemsRef.current.lineWidget?.clear();
+    editorItemsRef.current.commentLineWidget?.clear();
+    editorItemsRef.current.reactLineWidget?.clear();
 
     const lineWidget = editorRef.current?.addLineWidget(
       line,
@@ -353,7 +338,7 @@ function useEditorState() {
       },
     );
 
-    editorItemsRef.current.lineWidget = lineWidget;
+    editorItemsRef.current.commentLineWidget = lineWidget;
 
     //
 
@@ -402,38 +387,27 @@ function useEditorState() {
     evaluation: Evaluation,
     frame: StackFrame,
   ) => {
-    if (interestingTypes.includes(evaluation.e.type)) {
-      markEditor(evaluation);
-
-      if (evaluation.phase === 'enter') {
-        displayComments(evaluation.e);
-      }
-    }
+    const isInteresting = interestingTypes.includes(
+      evaluation.e.type,
+    );
 
     if (
       evaluation.phase === 'exit' &&
+      evaluation.e.type === 'Program'
+    ) {
+      editorItemsRef.current.commentLineWidget?.clear();
+      editorItemsRef.current.reactLineWidget?.clear();
+      editorItemsRef.current.marker?.clear();
+    }
+
+    if (
+      // @ts-ignore
+      evaluation.phase === 'value' &&
       evaluation.e.type === 'AssignmentExpression'
     ) {
-      displayValueInEditor(
-        evaluation.e,
-        frame,
-        `= ${evaluation.value}`,
-      );
-    }
-
-    if (
-      evaluation.phase === 'exit' &&
-      evaluation.e.type === 'VariableDeclarator'
-    ) {
-      displayValueInEditor(
-        evaluation.e.id,
-        frame,
-        `= ${formatValue(evaluation.value)}`,
-      );
-
       if (
         // @ts-ignore
-        window.featureFlags?.displayReact &&
+        // window.featureFlags?.displayReact &&
         isValidElement(evaluation.value)
       ) {
         displayReactElementValue(
@@ -441,6 +415,34 @@ function useEditorState() {
           evaluation.value,
         );
       }
+
+      displayValueInEditor(
+        evaluation.e,
+        frame,
+        `= ${formatValue(evaluation.value)}`,
+      );
+    }
+
+    if (
+      // @ts-ignore
+      evaluation.phase === 'value' &&
+      evaluation.e.type === 'VariableDeclaration'
+    ) {
+      if (
+        // @ts-ignore
+        // window.featureFlags?.displayReact &&
+        isValidElement(evaluation.value?.[0])
+      ) {
+        displayReactElementValue(
+          evaluation.e,
+          evaluation.value[0],
+        );
+      }
+      displayValueInEditor(
+        evaluation.e,
+        frame,
+        `= ${formatValue(evaluation.value?.[0])}`,
+      );
     }
 
     if (
@@ -450,7 +452,7 @@ function useEditorState() {
       displayValueInEditor(
         evaluation.e,
         frame,
-        `⇐ ${evaluation.value.value}`,
+        `⇐ ${formatValue(evaluation.value)}`,
       );
     }
 
@@ -458,10 +460,18 @@ function useEditorState() {
       evaluation.phase === 'enter' &&
       evaluation.e.type === 'Program'
     ) {
-      editorItemsRef.current.editorWidgetsByNode.set(
+      editorItemsRef.current.editorWidgetsByFrame.set(
         frame.sourceId,
         new Map(),
       );
+    }
+
+    if (isInteresting && evaluation.phase === 'enter') {
+      displayComments(evaluation.e);
+    }
+
+    if (isInteresting) {
+      markEditor(evaluation);
     }
   };
 
@@ -472,13 +482,13 @@ function useEditorState() {
     const metaFn = getMetaFunction(evaluation.e.fn)?.e;
     if (!metaFn) return;
 
-    const nodes = editorItemsRef.current.editorWidgetsByNode.get(
+    const nodes = editorItemsRef.current.editorWidgetsByFrame.get(
       frame.sourceId,
     );
 
     nodes?.forEach((node) => node.remove());
 
-    editorItemsRef.current.editorWidgetsByNode.set(
+    editorItemsRef.current.editorWidgetsByFrame.set(
       frame.sourceId,
       new Map(),
     );
@@ -514,20 +524,20 @@ function useEditorState() {
   };
 
   const clearCurrentMarker = () => {
-    editorItemsRef.current.lineWidget?.clear();
-
+    editorItemsRef.current.commentLineWidget?.clear();
+    editorItemsRef.current.reactLineWidget?.clear();
     editorItemsRef.current.marker?.clear();
   };
 
   const clearEditor = () => {
     clearCurrentMarker();
-    editorItemsRef.current.lineWidget?.clear();
+    editorItemsRef.current.commentLineWidget?.clear();
 
-    editorItemsRef.current.editorWidgetsByNode.forEach(
+    editorItemsRef.current.editorWidgetsByFrame.forEach(
       (l) => l.forEach((n) => n.remove()),
     );
 
-    editorItemsRef.current.editorWidgetsByNode = new Map();
+    editorItemsRef.current.editorWidgetsByFrame = new Map();
   };
 
   const getCode = () =>
@@ -586,7 +596,7 @@ export default function Meta() {
       callsRootImmutableRef:
         metaRef.current.execState.callsRootImmutableRef,
       allNodes: metaRef.current.execState.allStackNodes,
-      stack: metaRef.current.execState.callStack,
+      stack: [...metaRef.current.execState.callStack],
       watchValues: metaRef.current.execState.watchValues,
     });
 

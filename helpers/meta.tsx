@@ -36,6 +36,22 @@ const prettyBlockScopeTypeNames: {
   WhileStatement: 'while { }',
 };
 
+type ExecState = {
+  callStack: StackFrame[];
+  autoStepping: boolean;
+  running: boolean;
+  speed: number;
+  nextTimer?: number;
+  next?: () => any;
+  programTimers: Set<number>;
+  programIntervals: Set<number>;
+  allStackNodes: StackFrame[];
+  watchValues: WatchValues;
+  callsRootImmutableRef: StackFrame[];
+  programEnvKeys: string[];
+  callbackQueue: Function[];
+};
+
 export type BlockFrame = {
   id: string;
   type: typeof blockScopeTypes;
@@ -69,14 +85,13 @@ export type WatchValues = Record<
 
 export const interestingTypes: NodeNames[] = [
   'Apply',
+  'VariableDeclaration',
   'CallExpression',
   'AssignmentExpression',
-  'ReturnStatement',
-  'VariableDeclaration',
-  'ExpressionStatement',
-  'ConditionalExpression',
   'UpdateExpression',
+  'ConditionalExpression',
   //
+  'ReturnStatement',
   'IfStatement',
   'ForStatement',
   'ForInStatement',
@@ -162,21 +177,7 @@ export function meta({
   update: () => void;
 }) {
   // helpers
-  const execState: {
-    callStack: StackFrame[];
-    autoStepping: boolean;
-    running: boolean;
-    speed: number;
-    nextTimer?: number;
-    next?: () => any;
-    programTimers: Set<number>;
-    programIntervals: Set<number>;
-    allStackNodes: StackFrame[];
-    watchValues: WatchValues;
-    callsRootImmutableRef: StackFrame[];
-    programEnvKeys: string[];
-    callbackQueue: Function[];
-  } = {
+  const execState: ExecState = {
     speed,
     autoStepping: false,
     running: false,
@@ -268,33 +269,72 @@ export function meta({
             name
           ] as any;
 
-          f(node, c, cerr, env, config);
+          f(
+            node,
+            (r: any) => {
+              displayEvaluation(
+                {
+                  e: node,
+                  // @ts-ignore
+                  phase: 'value',
+                  value: r,
+                  config,
+                  env,
+                },
+                currentFrame(),
+              );
+
+              const next2 = () => {
+                execState.next = undefined;
+                c(r);
+              };
+
+              if (
+                node.type === 'VariableDeclaration' ||
+                node.type === 'AssignmentExpression'
+              ) {
+                enqueue(next2);
+              } else {
+                next2();
+              }
+            },
+            cerr,
+            env,
+            config,
+          );
         };
 
         // HACK: Program statements (not interesting) are handled as BlockStatements by the interpreter
-        if (node.type === 'Program') {
+        if (
+          node.type === 'Program' ||
+          node.type === 'VariableDeclaration' ||
+          node.type === 'AssignmentExpression'
+        ) {
           next();
-          return;
+        } else {
+          enqueue(next);
         }
-
-        if (execState.autoStepping) {
-          const run = () => {
-            if (execState.autoStepping) {
-              setTimeout(next, 10);
-            }
-          };
-
-          execState.nextTimer = (setTimeout as Timeout)(
-            run,
-            execState.speed,
-          );
-        }
-
-        execState.next = next;
       };
     }
 
     return map;
+  };
+
+  const enqueue = (next: () => any) => {
+    execState.next = next;
+
+    if (execState.autoStepping) {
+      const run = () => {
+        if (execState.autoStepping) {
+          next();
+        }
+      };
+
+      execState.nextTimer = (setTimeout as Timeout)(
+        run,
+        execState.speed,
+      );
+    }
   };
 
   const currentBlock = () => {
@@ -350,6 +390,7 @@ export function meta({
     if (fnName && evaluation.e.type === 'Apply') {
       if (evaluation.phase === 'enter') {
         const metaFn = getMetaFunction(evaluation.e.fn)?.e;
+
         const id = `${execState.allStackNodes.length}`;
         const frame = {
           fnName,
@@ -364,6 +405,7 @@ export function meta({
           hasReturned: false,
           returnValue: undefined,
           sourceId: metaFn?.range?.join(),
+          env: evaluation.env,
         };
 
         currentFrame().calls.push(frame);
@@ -388,15 +430,23 @@ export function meta({
       }
     } else {
       const frame = currentFrame();
+
       if (frame.id === '-1') {
         const values = omit(
           evaluation.env?.values ?? {},
           execState.programEnvKeys,
         );
 
-        frame.values = values;
+        frame.values = { ...frame.values, ...values };
       } else {
-        frame.values = evaluation.env?.values ?? {};
+        let env = evaluation.env;
+
+        // HACK
+        // @ts-ignore
+        while (env && env !== frame.env) {
+          frame.values = { ...frame.values, ...env.values };
+          env = env.prev;
+        }
       }
     }
 

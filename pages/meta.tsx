@@ -4,7 +4,7 @@ import {
   ReactElement,
   isValidElement,
 } from 'react';
-import { createPortal, render } from 'react-dom';
+import { render } from 'react-dom';
 
 import { Evaluation, ASTNode } from 'metaes/types';
 import { getMetaFunction } from 'metaes/metafunction';
@@ -17,6 +17,7 @@ import isObject from 'lodash/isObject';
 import isString from 'lodash/isString';
 import isDate from 'lodash/isDate';
 import isArray from 'lodash/isArray';
+
 import {
   meta,
   StackFrame,
@@ -86,7 +87,11 @@ function formatValue(arg: any): string {
   if (isFunction(arg)) {
     return `fn()`;
   } else if (isValidElement(arg)) {
-    return `<${arg.type ?? 'ReactElement'}>`;
+    return `<${
+      isString(arg.type) && arg.type.length
+        ? arg.type
+        : 'ReactElement'
+    }>`;
   } else if (isArray(arg)) {
     return isArray(arg[0])
       ? `[...]`
@@ -114,26 +119,28 @@ function formatArgs(args: any[]) {
 }
 
 const code = `// psst: you can edit me!
-
-const x = (
-  <div style={{ border: '1px red solid', padding: 10 }}>
-    <h1 style={{ color: 'red' }}>Hello!</h1>
-  </div>
+const X = (props) => (
+  <h1 style={{ color: 'red' }}>Hello {props.name}!</h1>
 );
-
-function fibonacci(num) {
-  if (num < 0) return null;
-  if (num <= 1) return num;
-
-  const f1 = fibonacci(num - 1);
-  const f2 = fibonacci(num - 2);
-  const result = f1 + f2;
-
-  return result;
-}
-
-const r = fibonacci(4);
+const x = <X name="world" />;
+const z = <div style={{ backgroundColor: 'pink' }}>{x}</div>;
+const a = 1;
 `;
+
+// const code = `// psst: you can edit me!
+// function fibonacci(num) {
+//   if (num < 0) return null;
+//   if (num <= 1) return num;
+
+//   const f1 = fibonacci(num - 1);
+//   const f2 = fibonacci(num - 2);
+//   const result = f1 + f2;
+
+//   return result;
+// }
+
+// const r = fibonacci(4);
+// `;
 
 const EditorValue = ({ value }: { value: string }) => (
   <div
@@ -176,7 +183,7 @@ const defaultSpeed = 800;
 const maxSpeed = 2000;
 const minSpeed = 60;
 
-function useEditorState({ displayReactElement }) {
+function useEditorState() {
   const editorRef = useRef<Editor>();
 
   const editorItemsRef = useRef<{
@@ -243,7 +250,7 @@ function useEditorState({ displayReactElement }) {
 
   const displayReactElementValue = (
     node: ASTNode,
-    value: ReactElement,
+    reactElement: ReactElement,
   ) => {
     const loc = astToCmLoc(node);
     const editor = editorRef.current;
@@ -252,11 +259,6 @@ function useEditorState({ displayReactElement }) {
     const { line } = loc.end;
 
     const l = document.createElement('div');
-    l.style.padding = '18px 36px';
-    l.style.fontFamily = 'sans-serif';
-    l.style.fontSize = '13px';
-    l.style.backgroundColor = '#eee';
-    l.style.color = '#000';
 
     // editorItemsRef.current.lineWidget?.clear();
 
@@ -268,6 +270,29 @@ function useEditorState({ displayReactElement }) {
         handleMouseEvents: true,
         // above: true,
       },
+    );
+
+    render(
+      <div
+        style={{
+          padding: '18px 36px',
+          backgroundColor: '#222',
+          fontSize: '13px',
+          fontFamily: 'sans-serif',
+        }}
+      >
+        <div
+          style={{
+            padding: '18px 36px',
+            backgroundColor: '#eee',
+            color: '#111',
+            borderRadius: '3px',
+          }}
+        >
+          {reactElement}
+        </div>
+      </div>,
+      l,
     );
 
     // editorItemsRef.current.lineWidget = lineWidget;
@@ -314,7 +339,7 @@ function useEditorState({ displayReactElement }) {
       l,
       {
         coverGutter: true,
-        handleMouseEvents: true,
+        // handleMouseEvents: true,
         // above: true,
       },
     );
@@ -371,7 +396,7 @@ function useEditorState({ displayReactElement }) {
     if (interestingTypes.includes(evaluation.e.type)) {
       markEditor(evaluation);
 
-      if (evaluation.phase) {
+      if (evaluation.phase === 'enter') {
         displayComments(evaluation.e);
       }
     }
@@ -398,15 +423,10 @@ function useEditorState({ displayReactElement }) {
       );
 
       if (isValidElement(evaluation.value)) {
-        const el = displayReactElementValue(
+        displayReactElementValue(
           evaluation.e,
           evaluation.value,
         );
-
-        displayReactElement({
-          el: evaluation.value,
-          node: el,
-        });
       }
     }
 
@@ -526,8 +546,6 @@ export default function Meta() {
     watchValues: {},
   });
 
-  const [{ el, node }, setEl] = useState({});
-
   const {
     getCode,
     clearEditor,
@@ -536,7 +554,7 @@ export default function Meta() {
     displayApplyExit,
     displayEvaluation,
     configEditor,
-  } = useEditorState({ displayReactElement: setEl });
+  } = useEditorState();
 
   // editor ui
 
@@ -888,7 +906,7 @@ export default function Meta() {
         {callGraphEl}
       </div>
 
-      {el && createPortal(el, node)}
+      {/* {el && createPortal(el, node)} */}
     </div>
   );
 }

@@ -160,7 +160,7 @@ const jsxInterpreters = {
                 const el = createElement(
                   tag,
                   attributes,
-                  children,
+                  ...children,
                 );
 
                 c(el);

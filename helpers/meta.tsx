@@ -10,11 +10,11 @@ import { JavaScriptASTNode } from 'metaes/nodeTypes';
 import { ECMAScriptInterpreters } from 'metaes/interpreters';
 import { SetValue } from 'metaes/environment';
 import { getMetaFunction } from 'metaes/metafunction';
-import { evaluate, visitArray } from 'metaes/evaluate';
+import { evaluate } from 'metaes/evaluate';
 import { liftedAll } from 'metaes/callcc';
 import omit from 'lodash/omit';
-import { createElement } from 'react';
 import jsxInterpreters from './jsxInterpreters';
+import { parseAndEvaluate } from './evaluate';
 
 type Timeout = (fn: () => void, ms: number) => number;
 
@@ -131,7 +131,6 @@ const elog = (evaluation: Evaluation) => {
       'SetValue',
       'Identifier',
       'Literal',
-      'VariableDeclaration',
     ].includes(type)
   ) {
     console.log(evaluation.e.type, evaluation);
@@ -457,7 +456,7 @@ export function meta({
     const programEnvKeys = Object.keys(programEnv);
     execState.programEnvKeys = programEnvKeys;
 
-    metaesEval(
+    parseAndEvaluate(
       code,
       maybeEndExec,
       handleError,

@@ -1,4 +1,3 @@
-import { metaesEval } from 'metaes';
 import {
   Continuation,
   ErrorContinuation,
@@ -216,13 +215,15 @@ export function meta({
     };
 
     return liftedAll({
-      clearTimeout: (timer: number) => {
+      clearTimeout: (timer: number, c: () => void) => {
         execState.programTimers.delete(timer);
         clearTimeout(timer);
+        c();
       },
-      clearInterval: (timer: number) => {
+      clearInterval: (timer: number, c: () => void) => {
         execState.programIntervals.delete(timer);
         clearInterval(timer);
+        c();
       },
       setTimeout: function (
         [fn, ms]: [() => void, number],
@@ -427,6 +428,9 @@ export function meta({
 
         displayApplyEnter(evaluation, frame, prevFrame());
       } else {
+        currentFrame().hasReturned = true;
+        currentFrame().returnValue = evaluation.value;
+
         displayApplyExit(
           evaluation,
           currentFrame(),

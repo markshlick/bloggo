@@ -106,9 +106,7 @@ function createWidget(
 let code: string;
 
 code = `// psst: you can edit me!
-const X = (props) => (
-  <h1 style={{ color: 'red', margin: 0 }}>Hello {props.name}!</h1>
-);
+const X = ({ name }) => <h1 style={{ color: 'red', margin: 0 }}>Hello {name}!</h1>;
 
 const x = <X name="world" />;
 const z = <div style={{ backgroundColor: 'pink', padding: 10 }}>{x}</div>;
@@ -117,20 +115,26 @@ let a;
 a = z;
 `;
 
-code = `// psst: you can edit me!
-function fibonacci(num) {
-  if (num < 0) return null;
-  if (num <= 1) return num;
+// code = `// psst: you can edit me!
+// function id(x) {
+//   return x;
+// }
 
-  const f1 = fibonacci(num - 1);
-  const f2 = fibonacci(num - 2);
-  const result = f1 + f2;
+// function fibonacci(num) {
+//   const _ = id(1);
+//   const __ = id(2);
+//   if (num < 0) return null;
+//   if (num <= 1) return num;
 
-  return result;
-}
+//   const f1 = fibonacci(num - 1);
+//   const f2 = fibonacci(num - 2);
+//   const result = f1 + f2;
 
-const r = fibonacci(2);
-`;
+//   return result;
+// }
+
+// const r = fibonacci(2);
+// `;
 
 // code = `
 // function x(z) {
@@ -195,7 +199,10 @@ function useEditorState() {
 
   const editorItemsRef = useRef<{
     marker?: TextMarker;
-    editorWidgetsByFrame: Map<string, Map<string, Widget>>;
+    editorWidgetsByFrame: Map<
+      string,
+      { widgets: Map<string, Widget>; frame: StackFrame }
+    >;
     commentLineWidget?: LineWidget;
     reactLineWidget?: LineWidget;
   }>({
@@ -239,19 +246,29 @@ function useEditorState() {
   };
 
   const getFrameWidgets = (frame: StackFrame) => {
-    let frameWidgets = editorItemsRef.current.editorWidgetsByFrame.get(
+    let frameVal = editorItemsRef.current.editorWidgetsByFrame.get(
       frame.id,
     );
 
-    if (!frameWidgets) {
-      frameWidgets = new Map();
+    if (!frameVal) {
+      frameVal = { widgets: new Map(), frame };
       editorItemsRef.current.editorWidgetsByFrame.set(
         frame.id,
-        frameWidgets,
+        frameVal,
       );
     }
 
-    return frameWidgets;
+    return frameVal.widgets;
+  };
+
+  const resetFrameWidgets = (frame: StackFrame) => {
+    const nodes = getFrameWidgets(frame);
+    nodes?.forEach((node) => node.remove());
+
+    editorItemsRef.current.editorWidgetsByFrame.set(
+      frame.id,
+      { widgets: new Map(), frame },
+    );
   };
 
   const displayReactElementValue = (
@@ -478,10 +495,7 @@ function useEditorState() {
       evaluation.phase === 'enter' &&
       evaluation.e.type === 'Program'
     ) {
-      editorItemsRef.current.editorWidgetsByFrame.set(
-        frame.id,
-        new Map(),
-      );
+      resetFrameWidgets(frame);
     }
 
     if (isInteresting && evaluation.phase === 'enter') {
@@ -493,14 +507,33 @@ function useEditorState() {
     }
   };
 
+  const clearPreviousCallsForFrameFn = (
+    currFrame: StackFrame,
+  ) => {
+    const prevDisplayedCalls = Array.from(
+      editorItemsRef.current.editorWidgetsByFrame.values(),
+    );
+
+    prevDisplayedCalls
+      .filter(
+        ({ frame }) =>
+          frame.sourceId === currFrame.sourceId,
+      )
+      .forEach(({ frame }) => {
+        const nodes = getFrameWidgets(frame);
+        nodes?.forEach((node) => node.remove());
+      });
+  };
+
   const displayApplyEnter = (
     evaluation: Evaluation,
-    frame: StackFrame,
+    currFrame: StackFrame,
     prevFrame: StackFrame,
   ) => {
     editorItemsRef.current.commentLineWidget?.clear();
-    const nodes = getFrameWidgets(prevFrame);
-    nodes?.forEach((node) => node.remove());
+    // const nodes = getFrameWidgets(prevFrame);
+    // nodes?.forEach((node) => node.remove());
+    clearPreviousCallsForFrameFn(currFrame);
 
     const metaFn = getMetaFunction(evaluation.e.fn)?.e;
     if (!metaFn) return;
@@ -509,7 +542,7 @@ function useEditorState() {
 
     displayValueInEditor(
       metaFn,
-      frame,
+      currFrame,
       `( ${evaluation.e.args.join(', ')} )`,
     );
 
@@ -522,18 +555,10 @@ function useEditorState() {
     prevFrame: StackFrame,
   ) => {
     editorItemsRef.current.commentLineWidget?.clear();
-    const nodes = getFrameWidgets(frame);
-    nodes?.forEach((node) => node.remove());
-    editorItemsRef.current.editorWidgetsByFrame.set(
-      frame.id,
-      new Map(),
-    );
+    clearPreviousCallsForFrameFn(prevFrame);
 
     const metaFn = getMetaFunction(evaluation.e.fn)?.e;
     if (!metaFn) return;
-
-    frame.hasReturned = true;
-    frame.returnValue = evaluation.value;
 
     const prevNodes = getFrameWidgets(prevFrame);
     prevNodes?.forEach((node) => node.attach());
@@ -550,7 +575,7 @@ function useEditorState() {
     editorItemsRef.current.commentLineWidget?.clear();
 
     editorItemsRef.current.editorWidgetsByFrame.forEach(
-      (l) => l.forEach((n) => n.remove()),
+      (l) => l.widgets.forEach((n) => n.remove()),
     );
 
     editorItemsRef.current.editorWidgetsByFrame = new Map();

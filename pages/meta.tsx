@@ -1,5 +1,10 @@
-import { useRef, useState, ReactElement } from 'react';
-import { render } from 'react-dom';
+import {
+  useRef,
+  useState,
+  ReactElement,
+  isValidElement,
+} from 'react';
+import { createPortal, render } from 'react-dom';
 
 import { Evaluation, ASTNode } from 'metaes/types';
 import { getMetaFunction } from 'metaes/metafunction';
@@ -29,6 +34,8 @@ const CodeEditor = dynamic(
 const Tree = dynamic(import('react-d3-tree'), {
   ssr: false,
 });
+
+const filler = `This is just example text for now, but you can add custom content (like React components) to locations.  The content is dynamic and receives the current evaluation context.  Bam!`;
 
 const handleError = (err: any) => {
   alert(JSON.stringify(err));
@@ -78,6 +85,8 @@ function addWidget(
 function formatValue(arg: any): string {
   if (isFunction(arg)) {
     return `fn()`;
+  } else if (isValidElement(arg)) {
+    return `<${arg.type ?? 'ReactElement'}>`;
   } else if (isArray(arg)) {
     return isArray(arg[0])
       ? `[...]`
@@ -104,49 +113,26 @@ function formatArgs(args: any[]) {
   return args.map((arg) => formatValue(arg)).join(', ');
 }
 
-// const code = `// psst: you can edit me!
-// function fibonacci(num) {
-//   if (num < 0) return null;
-//   if (num <= 1) return num;
-
-//   const f1 = fibonacci(num - 1);
-//   const f2 = fibonacci(num - 2);
-//   const result = f1 + f2;
-
-//   return result;
-// }
-
-// fibonacci(4);
-// `;
-
 const code = `// psst: you can edit me!
-function y(a) {
-  return a;
+
+const x = (
+  <div style={{ border: '1px red solid', padding: 10 }}>
+    <h1 style={{ color: 'red' }}>Hello!</h1>
+  </div>
+);
+
+function fibonacci(num) {
+  if (num < 0) return null;
+  if (num <= 1) return num;
+
+  const f1 = fibonacci(num - 1);
+  const f2 = fibonacci(num - 2);
+  const result = f1 + f2;
+
+  return result;
 }
 
-function x(n) {
-
-  for (let i = 0; i <= 3; i++) {
-    for (let i2 = 0; i2 <= 3; i2++) {
-      if (i && i2) {
-        console.log(i, i2);
-      }
-    }
-  }
-  // let s = 0;
-  // for (let i = 0; i <= 3; i++) {
-  //   s = i;
-  // }
-  
-  // let a;
-  // a = 1;
-
-  // const b = y(2);
-
-  // return a + b + y(3) + n;
-}
-
-const r = x(4);
+const r = fibonacci(4);
 `;
 
 const EditorValue = ({ value }: { value: string }) => (
@@ -186,11 +172,11 @@ const GraphNode = ({
   );
 };
 
-const defaultSpeed = 600;
+const defaultSpeed = 800;
 const maxSpeed = 2000;
 const minSpeed = 60;
 
-function useEditorState() {
+function useEditorState({ displayReactElement }) {
   const editorRef = useRef<Editor>();
 
   const editorItemsRef = useRef<{
@@ -218,7 +204,6 @@ function useEditorState() {
     const loc = astToCmLoc(evaluation.e);
     if (!loc || !editor) return;
 
-    const editorScrollInfo = editor.getScrollInfo();
     const { top } = editor.charCoords(loc.start, 'local');
 
     editorItemsRef.current.marker = editor.markText(
@@ -229,12 +214,14 @@ function useEditorState() {
       },
     );
 
+    const editorScrollInfo = editor.getScrollInfo();
+
     if (
       editorScrollInfo.top > top ||
       top >
         editorScrollInfo.top + editorScrollInfo.clientHeight
     ) {
-      editor.scrollTo(null, top);
+      editor.scrollTo(null, Math.max(top - 10, 0));
     }
   };
 
@@ -252,6 +239,101 @@ function useEditorState() {
     }
 
     return frameWidgets;
+  };
+
+  const displayReactElementValue = (
+    node: ASTNode,
+    value: ReactElement,
+  ) => {
+    const loc = astToCmLoc(node);
+    const editor = editorRef.current;
+    if (!loc || !editor) return;
+
+    const { line } = loc.end;
+
+    const l = document.createElement('div');
+    l.style.padding = '18px 36px';
+    l.style.fontFamily = 'sans-serif';
+    l.style.fontSize = '13px';
+    l.style.backgroundColor = '#eee';
+    l.style.color = '#000';
+
+    // editorItemsRef.current.lineWidget?.clear();
+
+    const lineWidget = editorRef.current?.addLineWidget(
+      line,
+      l,
+      {
+        coverGutter: true,
+        handleMouseEvents: true,
+        // above: true,
+      },
+    );
+
+    // editorItemsRef.current.lineWidget = lineWidget;
+
+    //
+
+    const { top } = editor.charCoords(loc.start, 'local');
+
+    const editorScrollInfo = editor.getScrollInfo();
+
+    if (
+      editorScrollInfo.top > top + 100 ||
+      top + 100 >
+        editorScrollInfo.top + editorScrollInfo.clientHeight
+    ) {
+      editor.scrollTo(null, Math.max(top - 10, 0));
+    }
+
+    return l;
+  };
+
+  const displayComments = (node: ASTNode) => {
+    const loc = astToCmLoc(node);
+    const editor = editorRef.current;
+    if (!loc || !editor) return;
+
+    const { line } = loc.start;
+
+    const l = document.createElement('div');
+    l.innerHTML = `<h2>${node.type}</h2><p><em>${filler}</em></p>`;
+    // l.style.height = '100px';
+    l.style.padding = '18px 36px';
+    l.style.maxHeight = '300px';
+    l.style.fontFamily = 'sans-serif';
+    l.style.fontSize = '13px';
+    l.style.backgroundColor = '#111';
+    l.style.color = '#eee';
+    l.style.overflow = 'scroll';
+
+    editorItemsRef.current.lineWidget?.clear();
+
+    const lineWidget = editorRef.current?.addLineWidget(
+      line,
+      l,
+      {
+        coverGutter: true,
+        handleMouseEvents: true,
+        // above: true,
+      },
+    );
+
+    editorItemsRef.current.lineWidget = lineWidget;
+
+    //
+
+    const { top } = editor.charCoords(loc.start, 'local');
+
+    const editorScrollInfo = editor.getScrollInfo();
+
+    if (
+      editorScrollInfo.top > top + 100 ||
+      top + 100 >
+        editorScrollInfo.top + editorScrollInfo.clientHeight
+    ) {
+      editor.scrollTo(null, Math.max(top - 10, 0));
+    }
   };
 
   const displayValueInEditor = (
@@ -280,8 +362,6 @@ function useEditorState() {
     const frameWidgets = getFrameWidgets(frame);
     frameWidgets.get(key)?.remove();
     frameWidgets.set(key, el);
-
-    return el;
   };
 
   const displayEvaluation = (
@@ -290,6 +370,10 @@ function useEditorState() {
   ) => {
     if (interestingTypes.includes(evaluation.e.type)) {
       markEditor(evaluation);
+
+      if (evaluation.phase) {
+        displayComments(evaluation.e);
+      }
     }
 
     if (
@@ -310,8 +394,20 @@ function useEditorState() {
       displayValueInEditor(
         evaluation.e.id,
         frame,
-        `= ${evaluation.value}`,
+        `= ${formatValue(evaluation.value)}`,
       );
+
+      if (isValidElement(evaluation.value)) {
+        const el = displayReactElementValue(
+          evaluation.e,
+          evaluation.value,
+        );
+
+        displayReactElement({
+          el: evaluation.value,
+          node: el,
+        });
+      }
     }
 
     if (
@@ -354,11 +450,15 @@ function useEditorState() {
       new Map(),
     );
 
+    displayComments(metaFn);
+
     displayValueInEditor(
       metaFn,
       frame,
       `( ${evaluation.e.args.join(', ')} )`,
     );
+
+    markEditor({ ...evaluation, e: metaFn });
   };
 
   const displayApplyExit = (
@@ -374,17 +474,22 @@ function useEditorState() {
     displayValueInEditor(
       metaFn,
       frame,
-      `( ${evaluation.e.args.join(', ')} ) => ${
-        frame.returnValue
-      }`,
+      `( ${evaluation.e.args.join(', ')} ) => ${formatValue(
+        frame.returnValue,
+      )}`,
     );
   };
 
-  const clearCurrentMarker = () =>
+  const clearCurrentMarker = () => {
+    editorItemsRef.current.lineWidget?.clear();
+
     editorItemsRef.current.marker?.clear();
+  };
 
   const clearEditor = () => {
     clearCurrentMarker();
+    editorItemsRef.current.lineWidget?.clear();
+
     editorItemsRef.current.editorWidgetsByNode.forEach(
       (l) => l.forEach((n) => n.remove()),
     );
@@ -421,6 +526,8 @@ export default function Meta() {
     watchValues: {},
   });
 
+  const [{ el, node }, setEl] = useState({});
+
   const {
     getCode,
     clearEditor,
@@ -429,7 +536,7 @@ export default function Meta() {
     displayApplyExit,
     displayEvaluation,
     configEditor,
-  } = useEditorState();
+  } = useEditorState({ displayReactElement: setEl });
 
   // editor ui
 
@@ -687,13 +794,14 @@ export default function Meta() {
   );
 
   return (
-    <div style={{ margin: '0 auto', maxWidth: 840 }}>
+    <div style={{ margin: '20px auto', maxWidth: 840 }}>
       <div key="editor" className="space">
         <div
-          style={{ height: '30vh', minHeight: 320 }}
+          style={{ height: '30vh', minHeight: 400 }}
           className="space-small"
         >
           <CodeEditor
+            key="code"
             editorDidMount={configEditor}
             value={code}
             options={{
@@ -779,6 +887,8 @@ export default function Meta() {
         {callStackEl}
         {callGraphEl}
       </div>
+
+      {el && createPortal(el, node)}
     </div>
   );
 }

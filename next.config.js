@@ -49,6 +49,13 @@ function config() {
   return {
     target: 'serverless',
     pageExtensions: pageExts,
+    typescript: {
+      // !! WARN !!
+      // Dangerously allow production builds to successfully complete even if
+      // your project has type errors.
+      // !! WARN !!
+      ignoreBuildErrors: true,
+    },
   };
 }
 

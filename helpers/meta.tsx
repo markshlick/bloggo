@@ -10,9 +10,11 @@ import { JavaScriptASTNode } from 'metaes/nodeTypes';
 import { ECMAScriptInterpreters } from 'metaes/interpreters';
 import { SetValue } from 'metaes/environment';
 import { getMetaFunction } from 'metaes/metafunction';
-import { evaluate } from 'metaes/evaluate';
+import { evaluate, visitArray } from 'metaes/evaluate';
 import { liftedAll } from 'metaes/callcc';
 import omit from 'lodash/omit';
+import { createElement } from 'react';
+import jsxInterpreters from './jsxInterpreters';
 
 type Timeout = (fn: () => void, ms: number) => number;
 
@@ -66,6 +68,7 @@ export type WatchValues = Record<
 >;
 
 export const interestingTypes: NodeNames[] = [
+  'Apply',
   'CallExpression',
   'AssignmentExpression',
   'ReturnStatement',
@@ -301,7 +304,7 @@ export function meta({
   };
 
   const updateStackState = (evaluation: Evaluation) => {
-    // elog(evaluation);
+    elog(evaluation);
 
     const evaluationType = evaluation.e.type;
     if (blockScopeTypes.includes(evaluationType)) {
@@ -318,17 +321,14 @@ export function meta({
           children: [],
         };
 
-        const currentBlock =
-          stackFrame.blockStack[
-            stackFrame.blockStack.length - 1
-          ];
+        const prevBlock = currentBlock();
 
-        if (!currentBlock) {
+        if (!prevBlock) {
           stackFrame.allBlocks.push(blockFrame);
           stackFrame.children.push(blockFrame);
         } else {
-          currentBlock.allBlocks.push(blockFrame);
-          currentBlock.children.push(blockFrame);
+          prevBlock.allBlocks.push(blockFrame);
+          prevBlock.children.push(blockFrame);
         }
 
         execState.callsRootImmutableRef = [
@@ -336,7 +336,10 @@ export function meta({
         ];
 
         stackFrame.blockStack.push(blockFrame);
+
+        // displayBlockEnter(evaluation, blockFrame, frame);
       } else {
+        // displayBlockExit(evaluation, blockFrame, frame);
         stackFrame.blockStack.pop();
       }
     }
@@ -465,6 +468,7 @@ export function meta({
           prev: ECMAScriptInterpreters,
           values: {
             ...makeNodeHandlers(interestingTypes),
+            ...jsxInterpreters,
             SetValue: handleSetValue,
           },
         },

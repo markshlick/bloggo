@@ -129,6 +129,7 @@ const X = (props) => (
 );
 const x = <X name="world" />;
 const z = <div style={{ backgroundColor: 'pink' }}>{x}</div>;
+
 const a = 1;
 `;
 

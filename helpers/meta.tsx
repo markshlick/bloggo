@@ -1,3 +1,6 @@
+import { createElement } from 'react';
+
+import { noop } from 'metaes';
 import {
   Continuation,
   ErrorContinuation,
@@ -14,11 +17,10 @@ import {
 } from 'metaes/metafunction';
 import { evaluate } from 'metaes/evaluate';
 import { liftedAll } from 'metaes/callcc';
+
 import omit from 'lodash/omit';
 import jsxInterpreters from 'helpers/jsxInterpreters';
 import { parseAndEvaluate } from 'helpers/evaluate';
-import { createElement } from 'react';
-import { noop } from 'metaes';
 
 type Timeout = (fn: () => void, ms: number) => number;
 

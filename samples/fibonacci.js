@@ -11,4 +11,4 @@ function fibonacci(num) {
   return result;
 }
 
-const r = fibonacci(2);
+const r = fibonacci(3);

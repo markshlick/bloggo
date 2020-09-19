@@ -12,7 +12,10 @@ import {
   LineWidget,
   Position,
 } from 'codemirror';
-import { StackFrame, interestingTypes } from 'helpers/meta';
+import {
+  StackFrame,
+  interestingTypes,
+} from 'helpers/engine';
 import { formatValue } from 'helpers/formatValue';
 
 export type Widget = {

@@ -6,7 +6,7 @@ import {
   meta,
   StackFrame,
   WatchValues,
-} from 'helpers/meta';
+} from 'helpers/engine';
 
 import {
   formatArgs,

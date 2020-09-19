@@ -4,18 +4,13 @@ import { ECMAScriptInterpreters } from 'metaes/interpreters';
 import {
   createMetaFunctionWrapper,
   getMetaFunction,
-  evaluateMetaFunction,
-  markAsMetaFunction,
 } from 'metaes/metafunction';
-import { CallExpression } from 'metaes/nodeTypes';
 import {
   ASTNode,
   Continuation,
   Environment,
   ErrorContinuation,
   EvaluationConfig,
-  MetaesException,
-  MetaesFunction,
 } from 'metaes/types';
 import { createElement } from 'react';
 

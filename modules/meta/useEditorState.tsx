@@ -258,7 +258,6 @@ export function useEditorState() {
   };
 
   const displayComments = (node: ASTNode) => {
-    return;
     const loc = astToCmLoc(node);
     const editor = editorRef.current;
     if (!loc || !editor) return;

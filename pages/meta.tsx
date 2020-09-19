@@ -15,7 +15,7 @@ import {
 
 import { useEditorState } from 'modules/meta/useEditorState';
 
-import code from '!!raw-loader!samples/assignment';
+import code from '!!raw-loader!samples/fibonacci';
 
 const Tree = dynamic(import('react-d3-tree'), {
   ssr: false,

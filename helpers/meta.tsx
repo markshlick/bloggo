@@ -8,12 +8,17 @@ import {
 import { JavaScriptASTNode } from 'metaes/nodeTypes';
 import { ECMAScriptInterpreters } from 'metaes/interpreters';
 import { SetValue } from 'metaes/environment';
-import { getMetaFunction } from 'metaes/metafunction';
+import {
+  createMetaFunctionWrapper,
+  getMetaFunction,
+} from 'metaes/metafunction';
 import { evaluate } from 'metaes/evaluate';
 import { liftedAll } from 'metaes/callcc';
 import omit from 'lodash/omit';
 import jsxInterpreters from 'helpers/jsxInterpreters';
 import { parseAndEvaluate } from 'helpers/evaluate';
+import { createElement } from 'react';
+import { noop } from 'metaes';
 
 type Timeout = (fn: () => void, ms: number) => number;
 
@@ -215,6 +220,36 @@ export function meta({
     };
 
     return liftedAll({
+      createElement: (
+        [tag, ...rest]: [any, any[]],
+        c: (next: any) => void,
+        cerr: (next: any) => void,
+      ) => {
+        const el = createElement(tag, ...rest);
+
+        const mfn = getMetaFunction(tag);
+        const fn = createMetaFunctionWrapper({
+          ...mfn,
+          config: {
+            interceptor: noop,
+            interpreters: {
+              prev: ECMAScriptInterpreters,
+              values: {
+                ...jsxInterpreters,
+              },
+            },
+          },
+        });
+
+        const fakeEl = {
+          ...el,
+          type: () => {
+            return createElement(fn, ...rest);
+          },
+        };
+
+        c(fakeEl);
+      },
       clearTimeout: (timer: number, c: () => void) => {
         execState.programTimers.delete(timer);
         clearTimeout(timer);
@@ -313,6 +348,7 @@ export function meta({
         // HACK: Program statements (not interesting) are handled as BlockStatements by the interpreter
         if (
           node.type === 'Program' ||
+          // node.type === 'JSXElement' ||
           node.type === 'VariableDeclaration' ||
           node.type === 'AssignmentExpression'
         ) {

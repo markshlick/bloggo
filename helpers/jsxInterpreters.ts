@@ -1,12 +1,22 @@
+import { noop } from 'metaes';
 import { evaluate, visitArray } from 'metaes/evaluate';
+import { ECMAScriptInterpreters } from 'metaes/interpreters';
+import {
+  createMetaFunctionWrapper,
+  getMetaFunction,
+  evaluateMetaFunction,
+  markAsMetaFunction,
+} from 'metaes/metafunction';
+import { CallExpression } from 'metaes/nodeTypes';
 import {
   ASTNode,
   Continuation,
   Environment,
   ErrorContinuation,
   EvaluationConfig,
+  MetaesException,
+  MetaesFunction,
 } from 'metaes/types';
-
 import { createElement } from 'react';
 
 type Visitor<T> = (
@@ -165,19 +175,44 @@ const jsxInterpreters = {
           (children) => {
             const tagName = e.openingElement.name.name;
             const isCompat = /^[a-z]/.test(tagName);
-
             evaluate(
               isCompat
                 ? { type: 'Literal', value: tagName }
                 : { type: 'Identifier', name: tagName },
               (tag) => {
+                const mfn = getMetaFunction(tag);
+                const fn = createMetaFunctionWrapper({
+                  ...mfn,
+                  config: {
+                    interceptor: noop,
+                    interpreters: {
+                      prev: ECMAScriptInterpreters,
+                      values: {
+                        ...jsxInterpreters,
+                      },
+                    },
+                  },
+                });
+
                 const el = createElement(
                   tag,
                   attributes,
                   ...children,
                 );
 
-                c(el);
+                const fakeEl = {
+                  ...el,
+                  type: (props: any) => {
+                    const e = createElement(
+                      isCompat ? tag : fn,
+                      props,
+                    );
+
+                    return e;
+                  },
+                };
+
+                c(fakeEl);
               },
               cerr,
               env,
@@ -193,6 +228,46 @@ const jsxInterpreters = {
       config,
     );
   },
+  // JSXElement: (
+  //   e: {
+  //     openingElement: {
+  //       name: { name: string };
+  //       attributes: any;
+  //     };
+  //     children: any[];
+  //   },
+  //   c: Continuation,
+  //   cerr: ErrorContinuation,
+  //   env: Environment,
+  //   config: EvaluationConfig,
+  // ) => {
+  //   const tagName = e.openingElement.name.name;
+  //   const isCompat = /^[a-z]/.test(tagName);
+  //   GetValueSync('CallExpression', config.interpreters)(
+  //     {
+  //       type: 'CallExpression',
+  //       callee: {
+  //         type: 'Identifier',
+  //         name: 'createElement',
+  //       },
+  //       arguments: [
+  //         isCompat
+  //           ? {
+  //               type: 'Literal',
+  //               value: tagName,
+  //             }
+  //           : {
+  //               type: 'Identifier',
+  //               name: tagName,
+  //             },
+  //       ],
+  //     },
+  //     c,
+  //     cerr,
+  //     env,
+  //     config,
+  //   );
+  // },
 };
 
 export default jsxInterpreters;

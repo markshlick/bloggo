@@ -105,14 +105,21 @@ function createWidget(
 
 let code: string;
 
-code = `// psst: you can edit me!
-const X = ({ name }) => <h1 style={{ color: 'red', margin: 0 }}>Hello {name}!</h1>;
+code = `// psst - you can edit me!
+function Hello({ name }) {
+  return (
+    <div
+      style={{ backgroundColor: 'pink', color: 'purple' }}
+    >
+      Hello {name}
+    </div>
+  );
+}
 
-const x = <X name="world" />;
-const z = <div style={{ backgroundColor: 'pink', padding: 10 }}>{x}</div>;
-
-let a;
-a = z;
+const x = <Hello name="world" />;
+const y = (
+  <div style={{ border: '1px blue solid' }}>{x}</div>
+);
 `;
 
 // code = `// psst: you can edit me!
@@ -323,7 +330,7 @@ function useEditorState() {
 
     //
 
-    const { top } = editor.charCoords(loc.start, 'local');
+    const { top } = editor.charCoords(loc.end, 'local');
 
     const editorScrollInfo = editor.getScrollInfo();
 
@@ -343,7 +350,7 @@ function useEditorState() {
     const editor = editorRef.current;
     if (!loc || !editor) return;
 
-    const { line } = loc.start;
+    const { line } = loc.end;
 
     const l = document.createElement('div');
     l.innerHTML = `<h2>${node.type}</h2><p><em>${filler}</em></p>`;
@@ -373,7 +380,7 @@ function useEditorState() {
 
     //
 
-    const { top } = editor.charCoords(loc.start, 'local');
+    const { top } = editor.charCoords(loc.end, 'local');
 
     const editorScrollInfo = editor.getScrollInfo();
 

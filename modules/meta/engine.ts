@@ -89,6 +89,36 @@ export type WatchValues = Record<
   { frame: StackFrame; value: any }[]
 >;
 
+export type Origin = {
+  node: ASTNode;
+  frame: StackFrame;
+};
+
+export type EvaluationContext = {
+  origin?: Origin;
+};
+
+export type Engine = {
+  speed: number;
+  handleError: (err: any) => void;
+  displayApplyEnter: (
+    evaluation: Evaluation,
+    frame: StackFrame,
+    prevFrame: StackFrame,
+  ) => void;
+  displayApplyExit: (
+    evaluation: Evaluation,
+    frame: StackFrame,
+    prevFrame: StackFrame,
+  ) => void;
+  displayEvaluation: (
+    evaluation: Evaluation,
+    frame: StackFrame,
+    context: EvaluationContext,
+  ) => void;
+  update: () => void;
+};
+
 export const interestingTypes: NodeNames[] = [
   'Apply',
   'VariableDeclarator',
@@ -181,25 +211,7 @@ export function meta({
   displayApplyExit,
   displayEvaluation,
   update,
-}: {
-  speed: number;
-  handleError: (err: any) => void;
-  displayApplyEnter: (
-    evaluation: Evaluation,
-    frame: StackFrame,
-    prevFrame: StackFrame,
-  ) => void;
-  displayApplyExit: (
-    evaluation: Evaluation,
-    frame: StackFrame,
-    prevFrame: StackFrame,
-  ) => void;
-  displayEvaluation: (
-    evaluation: Evaluation,
-    frame: StackFrame,
-  ) => void;
-  update: () => void;
-}) {
+}: Engine) {
   // helpers
   const execState: ExecState = {
     speed,
@@ -319,6 +331,14 @@ export function meta({
       f(
         node,
         (r: any) => {
+          const context: EvaluationContext = {};
+          if (
+            node.type === 'AssignmentExpression' &&
+            node.left.type === 'Identifier'
+          ) {
+            context.origin = getOrigin(node.left.name);
+          }
+
           displayEvaluation(
             {
               e: node,
@@ -329,6 +349,7 @@ export function meta({
               env,
             },
             currentFrame(),
+            context,
           );
 
           const next2 = () => {
@@ -394,6 +415,23 @@ export function meta({
   const currentBlock = () => {
     const frame = currentFrame();
     return frame.blockStack[frame.blockStack.length - 1];
+  };
+
+  const getOrigin = (name: string) => {
+    for (
+      let index = execState.callStack.length - 1;
+      index >= 0;
+      index--
+    ) {
+      const frame = execState.callStack[index];
+      const node = frame.origins[name];
+      if (node) {
+        return {
+          node,
+          frame,
+        };
+      }
+    }
   };
 
   const updateStackState = (evaluation: Evaluation) => {
@@ -524,7 +562,7 @@ export function meta({
       }
     }
 
-    displayEvaluation(evaluation, currentFrame());
+    displayEvaluation(evaluation, currentFrame(), {});
 
     update();
   };

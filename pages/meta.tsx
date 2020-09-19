@@ -344,7 +344,9 @@ export default function Meta() {
 
   return (
     <div style={{ margin: '20px auto', maxWidth: 840 }}>
-      <title>Learnable JavaScript</title>
+      <title>
+        Socrates :: Learnable CS with JavaScript
+      </title>
       <div key="editor" className="space">
         <div
           style={{ height: '30vh', minHeight: 400 }}

@@ -15,6 +15,7 @@ import {
 import {
   StackFrame,
   interestingTypes,
+  EvaluationContext,
 } from 'modules/meta/engine';
 import { formatValue } from 'helpers/formatValue';
 
@@ -328,6 +329,7 @@ export function useEditorState() {
   const displayEvaluation = (
     evaluation: Evaluation,
     frame: StackFrame,
+    context: EvaluationContext,
   ) => {
     const isInteresting = interestingTypes.includes(
       evaluation.e.type,
@@ -363,6 +365,16 @@ export function useEditorState() {
         frame,
         `= ${formatValue(evaluation.value)}`,
       );
+
+      if (context.origin) {
+        console.log(evaluation);
+
+        displayInlineValue(
+          context.origin.node,
+          context.origin.frame,
+          `= ${formatValue(evaluation.value)}`,
+        );
+      }
     }
 
     if (

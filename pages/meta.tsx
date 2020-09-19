@@ -29,7 +29,6 @@ const Tree = dynamic(import('react-d3-tree'), {
 });
 
 const handleError = (err: any) => {
-  alert(JSON.stringify(err));
   console.error(err);
 };
 

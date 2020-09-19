@@ -1,4 +1,4 @@
-import { createElement } from 'react';
+import React, { createElement } from 'react';
 
 import { noop } from 'metaes';
 import {
@@ -125,6 +125,7 @@ const globalObjects = {
   isNaN,
   JSON,
   console,
+  React,
 };
 
 type NodeNames = keyof typeof ECMAScriptInterpreters.values;
@@ -156,6 +157,16 @@ const elog = (evaluation: Evaluation) => {
   ) {
     console.log(evaluation.e.type, evaluation);
   }
+};
+
+const baseEvalConfig = {
+  interceptor: noop,
+  interpreters: {
+    prev: ECMAScriptInterpreters,
+    values: {
+      ...jsxInterpreters,
+    },
+  },
 };
 
 export function meta({
@@ -232,15 +243,7 @@ export function meta({
         const mfn = getMetaFunction(tag);
         const fn = createMetaFunctionWrapper({
           ...mfn,
-          config: {
-            interceptor: noop,
-            interpreters: {
-              prev: ECMAScriptInterpreters,
-              values: {
-                ...jsxInterpreters,
-              },
-            },
-          },
+          config: baseEvalConfig,
         });
 
         const fakeEl = {

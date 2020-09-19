@@ -1,5 +1,4 @@
 import React, { createElement } from 'react';
-
 import { noop } from 'metaes';
 import {
   Continuation,
@@ -7,6 +6,7 @@ import {
   Environment,
   EvaluationConfig,
   Evaluation,
+  ASTNode,
 } from 'metaes/types';
 import { JavaScriptASTNode } from 'metaes/nodeTypes';
 import { ECMAScriptInterpreters } from 'metaes/interpreters';
@@ -17,10 +17,9 @@ import {
 } from 'metaes/metafunction';
 import { evaluate } from 'metaes/evaluate';
 import { liftedAll } from 'metaes/callcc';
-
 import omit from 'lodash/omit';
-import jsxInterpreters from 'helpers/jsxInterpreters';
-import { parseAndEvaluate } from 'helpers/evaluate';
+import jsxInterpreters from 'modules/meta/jsxInterpreters';
+import { parseAndEvaluate } from 'modules/meta/evaluate';
 
 type Timeout = (fn: () => void, ms: number) => number;
 
@@ -78,6 +77,7 @@ export type StackFrame = {
   };
   returnValue: any;
   calls: StackFrame[];
+  origins: Record<string, ASTNode>;
   hasReturned: boolean;
   sourceId: string;
   blockStack: BlockFrame[];
@@ -91,7 +91,7 @@ export type WatchValues = Record<
 
 export const interestingTypes: NodeNames[] = [
   'Apply',
-  'VariableDeclaration',
+  'VariableDeclarator',
   'CallExpression',
   'AssignmentExpression',
   'UpdateExpression',
@@ -130,19 +130,24 @@ const globalObjects = {
 
 type NodeNames = keyof typeof ECMAScriptInterpreters.values;
 
-const programFrame = (): StackFrame => ({
-  fnName: 'Program',
-  id: '-1',
-  name: '-1',
+const blankFrameState = () => ({
+  origins: {},
   args: [],
   calls: [],
   children: [],
   values: {},
-  hasReturned: false,
-  returnValue: undefined,
-  sourceId: 'Program!',
   allBlocks: [],
   blockStack: [],
+  hasReturned: false,
+  returnValue: undefined,
+});
+
+const programFrame = (): StackFrame => ({
+  ...blankFrameState(),
+  fnName: 'Program',
+  id: '-1',
+  name: '-1',
+  sourceId: 'Program!',
 });
 
 const elog = (evaluation: Evaluation) => {
@@ -298,70 +303,72 @@ export function meta({
     });
   };
 
+  const step = (
+    node: JavaScriptASTNode,
+    c: Continuation,
+    cerr: ErrorContinuation,
+    env: Environment,
+    config: EvaluationConfig,
+  ) => {
+    const next = () => {
+      execState.next = undefined;
+      const f = (ECMAScriptInterpreters.values as any)[
+        node.type
+      ];
+
+      f(
+        node,
+        (r: any) => {
+          displayEvaluation(
+            {
+              e: node,
+              // @ts-ignore
+              phase: 'value',
+              value: r,
+              config,
+              env,
+            },
+            currentFrame(),
+          );
+
+          const next2 = () => {
+            execState.next = undefined;
+            c(r);
+          };
+
+          if (
+            node.type === 'Program' ||
+            node.type === 'VariableDeclarator' ||
+            node.type === 'AssignmentExpression'
+          ) {
+            enqueue(next2);
+          } else {
+            next2();
+          }
+        },
+        cerr,
+        env,
+        config,
+      );
+    };
+
+    if (
+      // HACK: Program statements (not interesting) are handled as BlockStatements by the interpreter
+      node.type === 'Program' ||
+      node.type === 'VariableDeclarator' ||
+      node.type === 'AssignmentExpression'
+    ) {
+      next();
+    } else {
+      enqueue(next);
+    }
+  };
+
   const makeNodeHandlers = (names: NodeNames[]) => {
     const map: Partial<{ [name in NodeNames]: any }> = {};
 
     for (const name of names) {
-      map[name] = (
-        node: JavaScriptASTNode,
-        c: Continuation,
-        cerr: ErrorContinuation,
-        env: Environment,
-        config: EvaluationConfig,
-      ) => {
-        const next = () => {
-          execState.next = undefined;
-          const f = ECMAScriptInterpreters.values[
-            name
-          ] as any;
-
-          f(
-            node,
-            (r: any) => {
-              displayEvaluation(
-                {
-                  e: node,
-                  // @ts-ignore
-                  phase: 'value',
-                  value: r,
-                  config,
-                  env,
-                },
-                currentFrame(),
-              );
-
-              const next2 = () => {
-                execState.next = undefined;
-                c(r);
-              };
-
-              if (
-                node.type === 'VariableDeclaration' ||
-                node.type === 'AssignmentExpression'
-              ) {
-                enqueue(next2);
-              } else {
-                next2();
-              }
-            },
-            cerr,
-            env,
-            config,
-          );
-        };
-
-        // HACK: Program statements (not interesting) are handled as BlockStatements by the interpreter
-        if (
-          node.type === 'Program' ||
-          // node.type === 'JSXElement' ||
-          node.type === 'VariableDeclaration' ||
-          node.type === 'AssignmentExpression'
-        ) {
-          next();
-        } else {
-          enqueue(next);
-        }
-      };
+      map[name] = step;
     }
 
     return map;
@@ -390,7 +397,12 @@ export function meta({
   };
 
   const updateStackState = (evaluation: Evaluation) => {
-    elog(evaluation);
+    console.log(
+      evaluation.e.type,
+      evaluation,
+      currentFrame(),
+      currentBlock(),
+    );
 
     const evaluationType = evaluation.e.type;
     if (blockScopeTypes.includes(evaluationType)) {
@@ -440,17 +452,11 @@ export function meta({
 
         const id = `${execState.allStackNodes.length}`;
         const frame = {
+          ...blankFrameState(),
           fnName,
           id,
           name: id,
           args: evaluation.e.args,
-          calls: [],
-          allBlocks: [],
-          children: [],
-          blockStack: [],
-          values: {},
-          hasReturned: false,
-          returnValue: undefined,
           sourceId: metaFn?.range?.join(),
           env: evaluation.env,
         };
@@ -504,6 +510,20 @@ export function meta({
       }
     }
 
+    if (
+      evaluation.phase === 'enter' &&
+      evaluation.e.type === 'VariableDeclarator'
+    ) {
+      const frame = currentFrame();
+      const declaration = evaluation.e;
+      if (
+        declaration.id &&
+        declaration.id.type === 'Identifier'
+      ) {
+        frame.origins[declaration.id.name] = evaluation.e;
+      }
+    }
+
     displayEvaluation(evaluation, currentFrame());
 
     update();
@@ -538,7 +558,8 @@ export function meta({
       return;
     }
 
-    execState.callStack = [programFrame()];
+    const rootFrame = programFrame();
+    execState.callStack = [rootFrame];
     execState.allStackNodes = [];
     execState.watchValues = {};
 
@@ -546,9 +567,7 @@ export function meta({
     // callsRootImmutableRef is an immutable *reference*
     // BUT it's values mutate
     // NOTE - it will not be reassigned if stack frame variable change
-    execState.callsRootImmutableRef = [
-      execState.callStack[0],
-    ];
+    execState.callsRootImmutableRef = [rootFrame];
 
     execState.running = true;
 

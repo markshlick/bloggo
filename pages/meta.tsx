@@ -6,27 +6,31 @@ import {
   meta,
   StackFrame,
   WatchValues,
-} from 'helpers/engine';
+} from 'modules/meta/engine';
 
 import {
   formatArgs,
   formatValue,
 } from 'helpers/formatValue';
 
-import { useEditorState } from 'helpers/useEditorState';
+import { useEditorState } from 'modules/meta/useEditorState';
 
-import code from '!!raw-loader!samples/fibonacci';
+import code from '!!raw-loader!samples/assignment';
+
+const Tree = dynamic(import('react-d3-tree'), {
+  ssr: false,
+});
 
 const CodeEditor = dynamic(
-  import('components/CodeEditor'),
+  import('modules/meta/components/CodeEditor'),
   {
     ssr: false,
   },
 );
 
-const Tree = dynamic(import('react-d3-tree'), {
-  ssr: false,
-});
+const defaultSpeed = 800;
+const maxSpeed = 2000;
+const minSpeed = 60;
 
 const handleError = (err: any) => {
   console.error(err);
@@ -45,44 +49,22 @@ const GraphNode = ({
           {nodeData?.args
             ? `(${formatArgs(nodeData?.args)})`
             : ''}
-
-          {/* {' => '}
-        {nodeData?.hasReturned
-          ? nodeData?.returnValue
-          : '...'} */}
         </strong>
       ) : null}
     </div>
   );
 };
 
-const defaultSpeed = 800;
-const maxSpeed = 2000;
-const minSpeed = 60;
-
 export default function Meta() {
   const [stackState, setStackState] = useState<{
-    currentEvaluation?: Evaluation;
-    callsRootImmutableRef: StackFrame[];
     stack: StackFrame[];
-    allNodes: StackFrame[];
+    callsRootImmutableRef: StackFrame[];
     watchValues: WatchValues;
   }>({
     stack: [],
     callsRootImmutableRef: [],
-    allNodes: [],
     watchValues: {},
   });
-
-  const {
-    getCode,
-    clearEditor,
-    clearCurrentMarker,
-    displayApplyEnter,
-    displayApplyExit,
-    displayEvaluation,
-    configEditor,
-  } = useEditorState();
 
   // editor ui
 
@@ -91,7 +73,6 @@ export default function Meta() {
     setStackState({
       watchValues: {},
       stack: [],
-      allNodes: [],
       callsRootImmutableRef: [],
     });
   };
@@ -100,7 +81,6 @@ export default function Meta() {
     setStackState({
       callsRootImmutableRef:
         metaRef.current.execState.callsRootImmutableRef,
-      allNodes: metaRef.current.execState.allStackNodes,
       stack: [...metaRef.current.execState.callStack],
       watchValues: metaRef.current.execState.watchValues,
     });
@@ -158,20 +138,42 @@ export default function Meta() {
     update();
   };
 
+  const {
+    getCode,
+    clearEditor,
+    clearCurrentMarker,
+    displayApplyEnter,
+    displayApplyExit,
+    displayEvaluation,
+    configEditor,
+  } = useEditorState();
+
   const metaRef = useRef(
     meta({
       speed: defaultSpeed,
-      handleError,
       displayApplyEnter,
       displayApplyExit,
       displayEvaluation,
+      handleError,
       update,
     }),
   );
 
   // view helpers
 
-  const buttons = (
+  const editorEl = (
+    <CodeEditor
+      key="code"
+      editorDidMount={configEditor}
+      value={code}
+      options={{
+        readOnly: metaRef.current.execState.running,
+        lineNumbers: true,
+      }}
+    />
+  );
+
+  const buttonsEl = (
     <div className="space-small">
       <button
         className="small"
@@ -213,7 +215,7 @@ export default function Meta() {
     </div>
   );
 
-  const playback = (
+  const playbackEl = (
     <div>
       <label>Playback speed</label>{' '}
       <input
@@ -231,66 +233,6 @@ export default function Meta() {
       />
     </div>
   );
-
-  function valueTable() {
-    const indexerName = 'Input';
-    const valueName = 'Fibonacci';
-
-    const tableValues: number[] = [];
-    for (const x of stackState.allNodes) {
-      tableValues[x.args[0]] =
-        tableValues[x.args[0]] ?? x.returnValue;
-    }
-
-    const filledArr = Array(tableValues.length).fill(null);
-
-    return (
-      <div key="table" className="space">
-        <h2>Values</h2>
-        <div
-          style={{
-            overflow: 'scroll',
-            border: '1px lightgray solid',
-            borderRadius: 4,
-            padding: 12,
-          }}
-        >
-          <table>
-            <tbody>
-              <tr>
-                <th
-                  scope="row"
-                  align="left"
-                  style={{ padding: 4 }}
-                >
-                  {indexerName}
-                </th>
-                {filledArr.map((n, i) => (
-                  <td key={i} style={{ padding: 4 }}>
-                    {i}
-                  </td>
-                ))}
-              </tr>
-              <tr>
-                <th
-                  scope="row"
-                  align="left"
-                  style={{ padding: 4 }}
-                >
-                  {valueName}
-                </th>
-                {filledArr.map((n, i) => (
-                  <td key={i} style={{ padding: 4 }}>
-                    {tableValues[i]}
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  }
 
   const callStackEl = (
     <div key="stack">
@@ -400,31 +342,19 @@ export default function Meta() {
     </div>
   );
 
-  const editor = (
-    <CodeEditor
-      key="code"
-      editorDidMount={configEditor}
-      value={code}
-      options={{
-        readOnly: metaRef.current.execState.running,
-        lineNumbers: true,
-      }}
-    />
-  );
-
   return (
     <div style={{ margin: '20px auto', maxWidth: 840 }}>
+      <title>Learnable JavaScript</title>
       <div key="editor" className="space">
         <div
           style={{ height: '30vh', minHeight: 400 }}
           className="space-small"
         >
-          {editor}
+          {editorEl}
         </div>
-        {buttons}
-        {playback}
+        {buttonsEl}
+        {playbackEl}
       </div>
-      {/* <div>{valueTable()}</div> */}
       <div
         key="data"
         className="space"
@@ -443,3 +373,59 @@ export default function Meta() {
 
 // @ts-ignore
 Meta.layout = null;
+
+// function valueTableEl() {
+//   const indexerName = 'Input';
+//   const valueName = '';
+
+//   const tableValues: number[] = [];
+
+//   const filledArr = Array(tableValues.length).fill(null);
+
+//   return (
+//     <div key="table" className="space">
+//       <h2>Values</h2>
+//       <div
+//         style={{
+//           overflow: 'scroll',
+//           border: '1px lightgray solid',
+//           borderRadius: 4,
+//           padding: 12,
+//         }}
+//       >
+//         <table>
+//           <tbody>
+//             <tr>
+//               <th
+//                 scope="row"
+//                 align="left"
+//                 style={{ padding: 4 }}
+//               >
+//                 {indexerName}
+//               </th>
+//               {filledArr.map((n, i) => (
+//                 <td key={i} style={{ padding: 4 }}>
+//                   {i}
+//                 </td>
+//               ))}
+//             </tr>
+//             <tr>
+//               <th
+//                 scope="row"
+//                 align="left"
+//                 style={{ padding: 4 }}
+//               >
+//                 {valueName}
+//               </th>
+//               {filledArr.map((n, i) => (
+//                 <td key={i} style={{ padding: 4 }}>
+//                   {tableValues[i]}
+//                 </td>
+//               ))}
+//             </tr>
+//           </tbody>
+//         </table>
+//       </div>
+//     </div>
+//   );
+// }

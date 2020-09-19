@@ -15,7 +15,7 @@ import {
 import {
   StackFrame,
   interestingTypes,
-} from 'helpers/engine';
+} from 'modules/meta/engine';
 import { formatValue } from 'helpers/formatValue';
 
 export type Widget = {
@@ -76,10 +76,31 @@ export function createWidget(
   return display();
 }
 
+const Comment = ({ node }: { node: ASTNode }) => (
+  <div
+    style={{
+      padding: '18px 36px',
+      maxHeight: '300px',
+      fontFamily: 'sans-serif',
+      fontSize: '13px',
+      background: `linear-gradient(#111, #222)`,
+      color: '#eee',
+      overflow: 'scroll',
+    }}
+  >
+    <h2>{node.type}</h2>
+    <p>
+      <em>{filler}</em>
+    </p>
+  </div>
+);
+
 export const EditorValue = ({
   value,
+  glow,
 }: {
   value: string;
+  glow: boolean;
 }) => (
   <div
     style={{
@@ -87,6 +108,8 @@ export const EditorValue = ({
       fontStyle: 'italic',
       borderRadius: '4px',
       color: 'pink',
+      padding: '0px 6px',
+      animation: glow ? 'glow 1000ms ease-out' : '',
     }}
   >
     {value}
@@ -235,6 +258,7 @@ export function useEditorState() {
   };
 
   const displayComments = (node: ASTNode) => {
+    return;
     const loc = astToCmLoc(node);
     const editor = editorRef.current;
     if (!loc || !editor) return;
@@ -242,15 +266,7 @@ export function useEditorState() {
     const { line } = loc.start;
 
     const l = document.createElement('div');
-    l.innerHTML = `<h2>${node.type}</h2><p><em>${filler}</em></p>`;
-    // l.style.height = '100px';
-    l.style.padding = '18px 36px';
-    l.style.maxHeight = '300px';
-    l.style.fontFamily = 'sans-serif';
-    l.style.fontSize = '13px';
-    l.style.background = `linear-gradient(#111, #222)`;
-    l.style.color = '#eee';
-    l.style.overflow = 'scroll';
+    render(<Comment node={node} />, l);
 
     editorItemsRef.current.commentLineWidget?.clear();
     editorItemsRef.current.reactLineWidget?.clear();
@@ -279,35 +295,34 @@ export function useEditorState() {
     }
   };
 
-  const displayValueInEditor = (
+  const displayInlineValue = (
     node: ASTNode,
     frame: StackFrame,
     value: any,
   ) => {
-    if (!editorRef.current) return;
-
     const loc = astToCmLoc(node);
-    if (!loc) return;
+    if (!loc || !editorRef.current) return;
 
+    const frameWidgets = getFrameWidgets(frame);
     const key = (node.range ?? []).join();
-
     const { line } = loc.start;
     const ch =
       editorRef.current?.lineInfo(line)?.text?.length ?? 0;
 
-    // @ts-ignore
     const el = createWidget(
       node,
       frame,
       editorRef.current,
       { line: line, ch: ch },
-      <EditorValue value={value} />,
+      <EditorValue
+        glow={frameWidgets.has(key)}
+        value={value}
+      />,
     );
 
-    el.attach();
-
-    const frameWidgets = getFrameWidgets(frame);
     frameWidgets.get(key)?.remove();
+
+    el.attach();
     frameWidgets.set(key, el);
   };
 
@@ -344,7 +359,7 @@ export function useEditorState() {
         );
       }
 
-      displayValueInEditor(
+      displayInlineValue(
         evaluation.e,
         frame,
         `= ${formatValue(evaluation.value)}`,
@@ -354,22 +369,36 @@ export function useEditorState() {
     if (
       // @ts-ignore
       evaluation.phase === 'value' &&
-      evaluation.e.type === 'VariableDeclaration'
+      evaluation.e.type === 'AssignmentExpression' &&
+      evaluation.e.left.type === 'Identifier' &&
+      frame.origins[evaluation.e.left.name]
+    ) {
+      displayInlineValue(
+        frame.origins[evaluation.e.left.name],
+        frame,
+        `= ${formatValue(evaluation.value)}`,
+      );
+    }
+
+    if (
+      // @ts-ignore
+      evaluation.phase === 'value' &&
+      evaluation.e.type === 'VariableDeclarator'
     ) {
       if (
         // @ts-ignore
         // window.featureFlags?.displayReact &&
-        isValidElement(evaluation.value?.[0])
+        isValidElement(evaluation.value)
       ) {
         displayReactElementValue(
           evaluation.e,
-          evaluation.value[0],
+          evaluation.value,
         );
       }
-      displayValueInEditor(
+      displayInlineValue(
         evaluation.e,
         frame,
-        `= ${formatValue(evaluation.value?.[0])}`,
+        `= ${formatValue(evaluation.value)}`,
       );
     }
 
@@ -377,7 +406,7 @@ export function useEditorState() {
       evaluation.phase === 'exit' &&
       evaluation.e.type === 'ReturnStatement'
     ) {
-      displayValueInEditor(
+      displayInlineValue(
         evaluation.e,
         frame,
         `⇐ ${formatValue(evaluation.value.value)}`,
@@ -433,7 +462,7 @@ export function useEditorState() {
 
     displayComments(metaFn);
 
-    displayValueInEditor(
+    displayInlineValue(
       metaFn,
       currFrame,
       `( ${evaluation.e.args.join(', ')} )`,

@@ -44,7 +44,7 @@ const parseAndEvaluate = (
       return {
         script,
         config: { ...BaseConfig, ...config },
-        env: toEnvironment(env),
+        env: { ...toEnvironment(env) },
       };
     },
     c,

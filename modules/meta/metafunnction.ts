@@ -2,6 +2,7 @@ import { evaluate, visitArray } from 'metaes/evaluate';
 import {
   NotImplementedException,
   toException,
+  LocatedError,
 } from 'metaes/exceptions';
 import { FunctionNode } from 'metaes/nodeTypes';
 import {
@@ -206,5 +207,55 @@ export function Apply(
     }
   } catch (e) {
     cerr(e);
+  }
+}
+
+function _createMetaFunction(
+  e:
+    | NodeTypes.ArrowFunctionExpression
+    | NodeTypes.FunctionExpression,
+  c: Continuation,
+  cerr: ErrorContinuation,
+  env: Environment,
+  config: EvaluationConfig,
+) {
+  try {
+    c(createMetaFunction(e, env, config));
+  } catch (error) {
+    cerr(LocatedError(error, e));
+  }
+}
+
+export function ArrowFunctionExpression(
+  e: NodeTypes.ArrowFunctionExpression,
+  c: Continuation,
+  cerr: ErrorContinuation,
+  env: Environment,
+  config: EvaluationConfig,
+) {
+  _createMetaFunction(e, c, cerr, env, config);
+}
+
+export function FunctionExpression(
+  e: NodeTypes.FunctionExpression,
+  c: Continuation,
+  cerr: ErrorContinuation,
+  env: Environment,
+  config: EvaluationConfig,
+) {
+  _createMetaFunction(e, c, cerr, env, config);
+}
+
+export function FunctionDeclaration(
+  e: NodeTypes.FunctionDeclaration,
+  c: Continuation,
+  cerr: ErrorContinuation,
+  env: Environment,
+  config: EvaluationConfig,
+) {
+  try {
+    c(createMetaFunction(e, env, config));
+  } catch (error) {
+    cerr(LocatedError(error, e));
   }
 }

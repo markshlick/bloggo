@@ -23,7 +23,12 @@ import { liftedAll } from 'metaes/callcc';
 import omit from 'lodash/omit';
 import jsxInterpreters from 'modules/meta/jsxInterpreters';
 import { parseAndEvaluate } from 'modules/meta/evaluate';
-import { Apply } from 'modules/meta/applyInterpreter';
+import {
+  Apply,
+  ArrowFunctionExpression,
+  FunctionExpression,
+  FunctionDeclaration,
+} from 'modules/meta/metafunnction';
 
 type Timeout = (fn: () => void, ms: number) => number;
 
@@ -650,6 +655,9 @@ export function meta({
             ...jsxInterpreters,
             SetValue: handleSetValue,
             Apply,
+            ArrowFunctionExpression,
+            FunctionExpression,
+            FunctionDeclaration,
             AwaitExpression: (
               e: {
                 argument: ExpressionStatement;

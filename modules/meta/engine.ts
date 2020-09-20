@@ -143,6 +143,8 @@ export const interestingTypes: NodeNames[] = [
   'ForInStatement',
   'ForOfStatement',
   'WhileStatement',
+  // @ts-ignore
+  'AwaitExpression',
 ];
 
 const globalObjects = {
@@ -718,7 +720,7 @@ export function meta({
     }
 
     if (execState.awaitCount) {
-      setTimeout(maybeEndExec);
+      setTimeout(maybeEndExec, 100);
       return;
     }
 

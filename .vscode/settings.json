@@ -1,6 +1,7 @@
 {
-  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.tsdk": "/Users/mksh/Projects/mksh.io/node_modules/typescript/lib",
   "cSpell.enableFiletypes": [
+    "!typescriptreact",
     "mdx"
   ]
 }

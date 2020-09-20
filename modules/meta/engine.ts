@@ -8,7 +8,10 @@ import {
   Evaluation,
   ASTNode,
 } from 'metaes/types';
-import { JavaScriptASTNode } from 'metaes/nodeTypes';
+import {
+  JavaScriptASTNode,
+  ExpressionStatement,
+} from 'metaes/nodeTypes';
 import { ECMAScriptInterpreters } from 'metaes/interpreters';
 import { SetValue } from 'metaes/environment';
 import {
@@ -20,6 +23,7 @@ import { liftedAll } from 'metaes/callcc';
 import omit from 'lodash/omit';
 import jsxInterpreters from 'modules/meta/jsxInterpreters';
 import { parseAndEvaluate } from 'modules/meta/evaluate';
+import { Apply } from 'modules/meta/applyInterpreter';
 
 type Timeout = (fn: () => void, ms: number) => number;
 
@@ -42,6 +46,7 @@ const prettyBlockScopeTypeNames: {
 };
 
 type ExecState = {
+  awaitCount: number;
   callStack: StackFrame[];
   autoStepping: boolean;
   running: boolean;
@@ -155,6 +160,7 @@ const globalObjects = {
   isNaN,
   JSON,
   console,
+  Promise,
   React,
 };
 
@@ -204,6 +210,10 @@ const baseEvalConfig = {
   },
 };
 
+export const ErrorSymbol = (typeof Symbol === 'function'
+  ? Symbol
+  : (_: string) => _)('__error__');
+
 export function meta({
   speed,
   handleError,
@@ -215,6 +225,7 @@ export function meta({
   // helpers
   const execState: ExecState = {
     speed,
+    awaitCount: 0,
     autoStepping: false,
     running: false,
     next: undefined,
@@ -236,6 +247,14 @@ export function meta({
   const prevFrame = () =>
     execState.callStack[execState.callStack.length - 2];
 
+  const exceptionHandler = (exception: any) => {
+    if (exception.type === 'AsyncEnd') {
+      maybeEndExec();
+    } else {
+      handleError(exception);
+    }
+  };
+
   const makeHooks = () => {
     const runMetaFunction = (fn: Function) => {
       const { e, closure, config } = getMetaFunction(fn);
@@ -243,7 +262,7 @@ export function meta({
       evaluate(
         { e, fn, type: 'Apply', args: [] },
         maybeEndExec,
-        handleError,
+        exceptionHandler,
         closure,
         config,
       );
@@ -620,7 +639,7 @@ export function meta({
     parseAndEvaluate(
       code,
       maybeEndExec,
-      handleError,
+      exceptionHandler,
       programEnv,
       {
         interceptor: updateStackState,
@@ -630,6 +649,53 @@ export function meta({
             ...makeNodeHandlers(interestingTypes),
             ...jsxInterpreters,
             SetValue: handleSetValue,
+            Apply,
+            AwaitExpression: (
+              e: {
+                argument: ExpressionStatement;
+              },
+              c: Continuation,
+              cerr: ErrorContinuation,
+              env: Environment,
+              config: EvaluationConfig,
+            ) => {
+              evaluate(
+                e.argument,
+                (maybePromise) => {
+                  const stack = [...execState.callStack];
+                  execState.awaitCount++;
+                  maybePromise.then((value: unknown) => {
+                    execState.awaitCount--;
+                    execState.callbackQueue.push(() => {
+                      execState.callStack = stack;
+                      c(value);
+                    });
+                  });
+
+                  cerr({
+                    type: 'AwaitExpression',
+                    value: maybePromise,
+                    [ErrorSymbol]: true,
+                  });
+
+                  // if (value instanceof Promise) {
+                  //   execState.callbackQueue.push(() => {
+                  //     c(value);
+                  //   });
+                  //
+                  //   cerr({
+                  //     type: 'AwaitExpression',
+                  //     value,
+                  //   });
+                  // } else {
+                  //   c(value);
+                  // }
+                },
+                cerr,
+                env,
+                config,
+              );
+            },
           },
         },
       },
@@ -640,6 +706,12 @@ export function meta({
     if (execState.callbackQueue.length) {
       const next = execState.callbackQueue.shift();
       if (next) next();
+      return;
+    }
+
+    if (execState.awaitCount) {
+      setTimeout(maybeEndExec);
+      return;
     }
 
     if (

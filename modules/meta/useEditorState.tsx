@@ -16,6 +16,7 @@ import {
   StackFrame,
   interestingTypes,
   EvaluationContext,
+  ErrorSymbol,
 } from 'modules/meta/engine';
 import { formatValue } from 'helpers/formatValue';
 
@@ -367,8 +368,6 @@ export function useEditorState() {
       );
 
       if (context.origin) {
-        console.log(evaluation);
-
         displayInlineValue(
           context.origin.node,
           context.origin.frame,
@@ -415,7 +414,8 @@ export function useEditorState() {
 
     if (
       evaluation.phase === 'exit' &&
-      evaluation.e.type === 'ReturnStatement'
+      evaluation.e.type === 'ReturnStatement' &&
+      !evaluation.value[ErrorSymbol]
     ) {
       displayInlineValue(
         evaluation.e,

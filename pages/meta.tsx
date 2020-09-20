@@ -1,21 +1,17 @@
 import { useRef, useState } from 'react';
-import { Evaluation } from 'metaes/types';
 import dynamic from 'next/dynamic';
-
 import {
   meta,
   StackFrame,
   WatchValues,
 } from 'modules/meta/engine';
-
 import {
   formatArgs,
   formatValue,
 } from 'helpers/formatValue';
-
 import { useEditorState } from 'modules/meta/useEditorState';
 
-import code from '!!raw-loader!samples/fibonacci';
+import code from '!!raw-loader!samples/async';
 
 const Tree = dynamic(import('react-d3-tree'), {
   ssr: false,
@@ -281,7 +277,7 @@ export default function Meta() {
                       {fnName}({formatArgs(args)})
                     </em>
                   </h4>
-                  <div style={{ marginLeft: 12 }}>
+                  <div style={{ marginLeft: 8 }}>
                     {Object.entries(restValues).map(
                       ([name, value]) => (
                         <div key={name}>

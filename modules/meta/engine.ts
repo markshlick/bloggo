@@ -7,6 +7,7 @@ import {
   EvaluationConfig,
   Evaluation,
   ASTNode,
+  Interpreter,
 } from 'metaes/types';
 import {
   JavaScriptASTNode,
@@ -131,21 +132,19 @@ export type Engine = {
 };
 
 export const interestingTypes: NodeNames[] = [
-  'Apply',
   'VariableDeclarator',
   'CallExpression',
   'AssignmentExpression',
   'UpdateExpression',
   'ConditionalExpression',
-  //
   'ReturnStatement',
   'IfStatement',
   'ForStatement',
   'ForInStatement',
   'ForOfStatement',
   'WhileStatement',
-  // @ts-ignore
   'AwaitExpression',
+  // 'Apply',
 ];
 
 const globalObjects = {
@@ -195,20 +194,6 @@ const programFrame = (): StackFrame => ({
   name: '-1',
   sourceId: 'Program!',
 });
-
-const elog = (evaluation: Evaluation) => {
-  const type = evaluation.e.type;
-  if (
-    ![
-      'GetValue',
-      'SetValue',
-      'Identifier',
-      'Literal',
-    ].includes(type)
-  ) {
-    console.log(evaluation.e.type, evaluation);
-  }
-};
 
 export const ErrorSymbol = (typeof Symbol === 'function'
   ? Symbol
@@ -283,10 +268,9 @@ export function meta({
           config: {
             interceptor: noop,
             interpreters: {
-              prev: ECMAScriptInterpreters,
+              prev: { values: getInterpreters() },
               values: {
-                ...jsxInterpreters,
-                Apply,
+                ...makeNodeHandlers(interestingTypes),
               },
             },
           },
@@ -353,16 +337,12 @@ export function meta({
   ) => {
     const next = () => {
       execState.next = undefined;
-      const f =
-        // FIXME - override node types
-        // @ts-ignore
-        node.type !== 'AwaitExpression'
-          ? (ECMAScriptInterpreters.values as any)[
-              node.type
-            ]
-          : AwaitExpression;
+      // @ts-ignore
+      const interpreter: Interpreter<any> = getInterpreters()[
+        node.type
+      ];
 
-      f(
+      interpreter(
         node,
         (r: any) => {
           const context: EvaluationContext = {};
@@ -420,6 +400,19 @@ export function meta({
     } else {
       enqueue(next);
     }
+  };
+
+  const getInterpreters = () => {
+    return {
+      ...ECMAScriptInterpreters.values,
+      ...jsxInterpreters,
+      SetValue: handleSetValue,
+      Apply,
+      ArrowFunctionExpression,
+      FunctionExpression,
+      FunctionDeclaration,
+      AwaitExpression,
+    };
   };
 
   const makeNodeHandlers = (names: NodeNames[]) => {
@@ -662,16 +655,11 @@ export function meta({
       {
         interceptor: updateStackState,
         interpreters: {
-          prev: ECMAScriptInterpreters,
+          prev: {
+            values: getInterpreters(),
+          },
           values: {
             ...makeNodeHandlers(interestingTypes),
-            ...jsxInterpreters,
-            SetValue: handleSetValue,
-            Apply,
-            ArrowFunctionExpression,
-            FunctionExpression,
-            FunctionDeclaration,
-            // AwaitExpression,
           },
         },
       },

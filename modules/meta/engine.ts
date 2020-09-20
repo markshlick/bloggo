@@ -51,7 +51,7 @@ const prettyBlockScopeTypeNames: {
 };
 
 type ExecState = {
-  awaitCount: number;
+  // awaitCount: number;
   callStack: StackFrame[];
   autoStepping: boolean;
   running: boolean;
@@ -60,6 +60,7 @@ type ExecState = {
   next?: () => any;
   programTimers: Set<number>;
   programIntervals: Set<number>;
+  inFlightPromises: Set<Promise<unknown>>;
   allStackNodes: StackFrame[];
   watchValues: WatchValues;
   callsRootImmutableRef: StackFrame[];
@@ -171,7 +172,9 @@ const globalObjects = {
   React,
 };
 
-type NodeNames = keyof typeof ECMAScriptInterpreters.values;
+type NodeNames =
+  | keyof typeof ECMAScriptInterpreters.values
+  | 'AwaitExpression';
 
 const blankFrameState = () => ({
   origins: {},
@@ -207,16 +210,6 @@ const elog = (evaluation: Evaluation) => {
   }
 };
 
-const baseEvalConfig = {
-  interceptor: noop,
-  interpreters: {
-    prev: ECMAScriptInterpreters,
-    values: {
-      ...jsxInterpreters,
-    },
-  },
-};
-
 export const ErrorSymbol = (typeof Symbol === 'function'
   ? Symbol
   : (_: string) => _)('__error__');
@@ -232,13 +225,14 @@ export function meta({
   // helpers
   const execState: ExecState = {
     speed,
-    awaitCount: 0,
+    // awaitCount: 0,
     autoStepping: false,
     running: false,
     next: undefined,
     nextTimer: undefined,
     programTimers: new Set(),
     programIntervals: new Set(),
+    inFlightPromises: new Set(),
     watchValues: {},
     programEnvKeys: [],
     callbackQueue: [],
@@ -286,7 +280,16 @@ export function meta({
         const mfn = getMetaFunction(tag);
         const fn = createMetaFunctionWrapper({
           ...mfn,
-          config: baseEvalConfig,
+          config: {
+            interceptor: noop,
+            interpreters: {
+              prev: ECMAScriptInterpreters,
+              values: {
+                ...jsxInterpreters,
+                Apply,
+              },
+            },
+          },
         });
 
         const fakeEl = {
@@ -350,9 +353,14 @@ export function meta({
   ) => {
     const next = () => {
       execState.next = undefined;
-      const f = (ECMAScriptInterpreters.values as any)[
-        node.type
-      ];
+      const f =
+        // FIXME - override node types
+        // @ts-ignore
+        node.type !== 'AwaitExpression'
+          ? (ECMAScriptInterpreters.values as any)[
+              node.type
+            ]
+          : AwaitExpression;
 
       f(
         node,
@@ -386,7 +394,10 @@ export function meta({
           if (
             node.type === 'Program' ||
             node.type === 'VariableDeclarator' ||
-            node.type === 'AssignmentExpression'
+            node.type === 'AssignmentExpression' ||
+            // FIXME - override node types
+            // @ts-ignore
+            node.type === 'AwaitExpression'
           ) {
             enqueue(next2);
           } else {
@@ -660,55 +671,57 @@ export function meta({
             ArrowFunctionExpression,
             FunctionExpression,
             FunctionDeclaration,
-            AwaitExpression: (
-              e: {
-                argument: ExpressionStatement;
-              },
-              c: Continuation,
-              cerr: ErrorContinuation,
-              env: Environment,
-              config: EvaluationConfig,
-            ) => {
-              evaluate(
-                e.argument,
-                (maybePromise) => {
-                  const stack = [...execState.callStack];
-                  execState.awaitCount++;
-                  maybePromise.then((value: unknown) => {
-                    execState.awaitCount--;
-                    execState.callbackQueue.push(() => {
-                      execState.callStack = stack;
-                      c(value);
-                    });
-                  });
-
-                  cerr({
-                    type: 'AwaitExpression',
-                    value: maybePromise,
-                    [ErrorSymbol]: true,
-                  });
-
-                  // if (value instanceof Promise) {
-                  //   execState.callbackQueue.push(() => {
-                  //     c(value);
-                  //   });
-                  //
-                  //   cerr({
-                  //     type: 'AwaitExpression',
-                  //     value,
-                  //   });
-                  // } else {
-                  //   c(value);
-                  // }
-                },
-                cerr,
-                env,
-                config,
-              );
-            },
+            // AwaitExpression,
           },
         },
       },
+    );
+  };
+
+  const handleAwait = (
+    promise: Promise<unknown>,
+    c: Continuation,
+  ) => {
+    const stack = [...execState.callStack];
+    // execState.awaitCount++;
+    execState.inFlightPromises.add(promise);
+    promise.then((value: unknown) => {
+      // execState.awaitCount--;
+      execState.inFlightPromises.delete(promise);
+      execState.callbackQueue.push(() => {
+        execState.callStack = stack;
+        c(value);
+      });
+    });
+  };
+
+  const AwaitExpression = (
+    e: {
+      argument: ExpressionStatement;
+    },
+    c: Continuation,
+    cerr: ErrorContinuation,
+    env: Environment,
+    config: EvaluationConfig,
+  ) => {
+    evaluate(
+      e.argument,
+      (maybePromise) => {
+        if (maybePromise instanceof Promise) {
+          handleAwait(maybePromise, c);
+
+          cerr({
+            type: 'AwaitExpression',
+            value: maybePromise,
+            [ErrorSymbol]: true,
+          });
+        } else {
+          c(maybePromise);
+        }
+      },
+      cerr,
+      env,
+      config,
     );
   };
 
@@ -719,8 +732,10 @@ export function meta({
       return;
     }
 
-    if (execState.awaitCount) {
-      setTimeout(maybeEndExec, 100);
+    if (execState.inFlightPromises.size) {
+      Promise.race(
+        Array.from(execState.inFlightPromises.values()),
+      ).then(maybeEndExec);
       return;
     }
 

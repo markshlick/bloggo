@@ -29,7 +29,7 @@ export function formatValue(arg: any): string {
       arg.constructor.name === 'Object'
         ? ''
         : arg.constructor.name
-    }{${keys.join(', ')}}`;
+    } {${keys.join(', ')}}`;
   } else if (isDate(arg)) {
     return `Date{${arg.toISOString()}}`;
   } else if (isString(arg)) {

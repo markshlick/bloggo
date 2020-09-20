@@ -435,6 +435,14 @@ export function useEditorState() {
       displayComments(evaluation.e);
     }
 
+    if (
+      evaluation.e.type === 'AwaitExpression' &&
+      // @ts-ignore
+      evaluation.phase === 'value'
+    ) {
+      displayComments(evaluation.e);
+    }
+
     if (isInteresting) {
       markEditor(evaluation);
     }

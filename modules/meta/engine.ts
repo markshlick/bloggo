@@ -109,7 +109,7 @@ export type Origin = {
 
 export type EvaluationContext = {
   origin?: Origin;
-  previousFrame?: StackFrame[];
+  previousFrame?: StackFrame;
 };
 
 export type Engine = {
@@ -336,7 +336,9 @@ export function meta({
       interpreter(
         node,
         (r: any) => {
-          const context: EvaluationContext = {};
+          const context: EvaluationContext = {
+            previousFrame: prevFrame(),
+          };
           if (
             node.type === 'AssignmentExpression' &&
             node.left.type === 'Identifier'
@@ -665,7 +667,9 @@ export function meta({
     );
 
     if (isInteresting) {
-      displayEvaluation(evaluation, currentFrame(), {});
+      displayEvaluation(evaluation, currentFrame(), {
+        previousFrame: prevFrame(),
+      });
       update();
     }
   };

@@ -413,13 +413,22 @@ export function useEditorState() {
       evaluation.phase === 'exit'
     ) {
       editorItemsRef.current.commentLineWidget?.clear();
-      clearPreviousCallsForFrameFn(frame);
 
       const metaFn = getMetaFunction(evaluation.e.fn)?.e;
       if (!metaFn) return;
 
       const prevNodes = getFrameWidgets(frame);
       prevNodes?.forEach((node) => node.attach());
+    } else if (
+      evaluation.e.type === 'Apply' &&
+      // @ts-ignore
+      evaluation.phase === 'exit-before'
+    ) {
+      if (
+        context.previousFrame?.sourceId === frame.sourceId
+      ) {
+        clearPreviousCallsForFrameFn(frame);
+      }
     } else if (
       evaluation.e.type === 'Apply' &&
       // @ts-ignore

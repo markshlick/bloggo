@@ -28,7 +28,7 @@ const defaultSpeed = 800;
 const maxSpeed = 2000;
 const minSpeed = 60;
 
-const handleError = (err: any) => {
+const handleError = (err: unknown) => {
   console.error(err);
 };
 

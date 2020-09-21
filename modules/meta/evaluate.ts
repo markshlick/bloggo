@@ -23,7 +23,7 @@ const BaseConfig = {
 
 const parseAndEvaluate = (
   input: string,
-  c?: Continuation<any>,
+  c?: Continuation<unknown>,
   cerr?: ErrorContinuation,
   env = {},
   config = {},

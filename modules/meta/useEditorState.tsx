@@ -299,7 +299,7 @@ export function useEditorState() {
   const displayInlineValue = (
     node: ASTNode,
     frame: StackFrame,
-    value: any,
+    value: string,
   ) => {
     const loc = astToCmLoc(node);
     if (!loc || !editorRef.current) return;

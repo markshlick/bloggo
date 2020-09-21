@@ -5,10 +5,10 @@ import isString from 'lodash/isString';
 import isDate from 'lodash/isDate';
 import isArray from 'lodash/isArray';
 
-export function formatValue(arg: any): string {
+export function formatValue(arg: unknown): string {
   if (isFunction(arg)) {
     return `fn()`;
-  } else if (isValidElement(arg)) {
+  } else if (isObject(arg) && isValidElement(arg)) {
     return `<${
       isString(arg.type) && arg.type.length
         ? arg.type
@@ -35,9 +35,9 @@ export function formatValue(arg: any): string {
   } else if (isString(arg)) {
     return `"${arg}"`;
   } else {
-    return arg;
+    return `${arg}`;
   }
 }
-export function formatArgs(args: any[]) {
+export function formatArgs(args: unknown[]) {
   return args.map((arg) => formatValue(arg)).join(', ');
 }

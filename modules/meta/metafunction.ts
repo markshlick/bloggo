@@ -51,15 +51,15 @@ export const evaluateMetaFunction = (
   metaFunction: MetaesFunction,
   c: Continuation,
   cerr: ErrorContinuation,
-  thisObject: any,
-  args: any[],
+  thisObject: unknown,
+  args: unknown[],
   executionTimeConfig?: EvaluationConfig,
 ) => {
   const { e, closure, config } = metaFunction;
   const env = {
     prev: closure,
     values: { this: thisObject, arguments: args } as {
-      [key: string]: any;
+      [key: string]: unknown;
     },
   };
   let i = 0;
@@ -83,6 +83,7 @@ export const evaluateMetaFunction = (
             c,
             cerr,
             {
+              // @ts-ignore
               values: args[i++],
               prev: env,
               internal: true,
@@ -154,7 +155,7 @@ export const evaluateMetaFunction = (
 export const createMetaFunctionWrapper = (
   metaFunction: MetaesFunction,
 ) => {
-  const fn = function (this: any, ...args: unknown[]) {
+  const fn = function (this: unknown, ...args: unknown[]) {
     let result;
     let exception;
     evaluateMetaFunction(

@@ -14,11 +14,11 @@ async function b() {
 }
 
 async function c() {
-  return await Promise.resolve();
+  return await Promise.resolve(1);
 }
+
+c();
 
 console.log('before a()');
 console.log('a return', a());
 console.log('after a()');
-
-c();

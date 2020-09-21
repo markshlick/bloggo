@@ -29,6 +29,7 @@ import {
   ArrowFunctionExpression,
   FunctionExpression,
   FunctionDeclaration,
+  AwaitExpression,
 } from 'modules/meta/metafunction';
 
 type Timeout = (fn: () => void, ms: number) => number;
@@ -136,6 +137,7 @@ export const interestingTypes: NodeNames[] = [
   'WhileStatement',
   'AwaitExpression',
   'Apply',
+  'ExpressionStatement',
 ];
 
 const globalObjects = {
@@ -355,11 +357,6 @@ export function meta({
             context,
           );
 
-          const next2 = () => {
-            execState.next = undefined;
-            c(r);
-          };
-
           if (
             node.type === 'Program' ||
             node.type === 'VariableDeclarator' ||
@@ -368,12 +365,72 @@ export function meta({
             // @ts-ignore
             node.type === 'AwaitExpression'
           ) {
-            enqueue(next2);
+            enqueue(() => {
+              execState.next = undefined;
+              c(r);
+            });
           } else {
-            next2();
+            c(r);
           }
         },
-        cerr,
+        (err) => {
+          const isAwait =
+            // @ts-ignore
+            node.type === 'AwaitExpression' &&
+            err.value instanceof Promise;
+
+          const isReturn =
+            node.type === 'ReturnStatement' &&
+            // @ts-ignore
+            err.type === 'ReturnStatement';
+
+          if (isAwait) {
+            handleAwait(err.value, (value) => {
+              displayEvaluation(
+                {
+                  e: node,
+                  // @ts-ignore
+                  phase: 'value',
+                  value: err,
+                  config,
+                  env,
+                },
+                currentFrame(),
+                {},
+              );
+              enqueue(() => {
+                execState.next = undefined;
+                c(value);
+              });
+            });
+          }
+
+          if (
+            // @ts-ignore
+            isAwait ||
+            isReturn
+          ) {
+            displayEvaluation(
+              {
+                e: node,
+                // @ts-ignore
+                phase: 'value',
+                value: err,
+                config,
+                env,
+              },
+              currentFrame(),
+              {},
+            );
+
+            enqueue(() => {
+              execState.next = undefined;
+              cerr(err);
+            });
+          } else {
+            cerr(err);
+          }
+        },
         env,
         config,
       );
@@ -387,7 +444,11 @@ export function meta({
       // HACK: Program statements (not interesting) are handled as BlockStatements by the interpreter
       node.type === 'Program' ||
       node.type === 'VariableDeclarator' ||
+      node.type === 'ReturnStatement' ||
       node.type === 'AssignmentExpression' ||
+      node.type === 'ExpressionStatement' ||
+      // @ts-ignore
+      node.type === 'AwaitExpression' ||
       isApplyWithoutMetaFn
     ) {
       next();
@@ -693,36 +754,6 @@ export function meta({
         c(value);
       });
     });
-  };
-
-  const AwaitExpression = (
-    e: {
-      argument: ExpressionStatement;
-    },
-    c: Continuation,
-    cerr: ErrorContinuation,
-    env: Environment,
-    config: EvaluationConfig,
-  ) => {
-    evaluate(
-      e.argument,
-      (maybePromise) => {
-        if (maybePromise instanceof Promise) {
-          handleAwait(maybePromise, c);
-
-          cerr({
-            type: 'AwaitExpression',
-            value: maybePromise,
-            [ErrorSymbol]: true,
-          });
-        } else {
-          c(maybePromise);
-        }
-      },
-      cerr,
-      env,
-      config,
-    );
   };
 
   const maybeEndExec = () => {

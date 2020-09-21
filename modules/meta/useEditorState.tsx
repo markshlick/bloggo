@@ -14,7 +14,6 @@ import {
 } from 'codemirror';
 import {
   StackFrame,
-  interestingTypes,
   EvaluationContext,
   ErrorSymbol,
 } from 'modules/meta/engine';
@@ -106,7 +105,7 @@ export const EditorValue = ({
 }) => (
   <div
     style={{
-      marginLeft: 8,
+      // marginLeft: 4,
       fontStyle: 'italic',
       borderRadius: '4px',
       color: 'pink',
@@ -390,13 +389,24 @@ export function useEditorState() {
       );
     } else if (
       evaluation.e.type === 'ReturnStatement' &&
-      evaluation.phase === 'exit' &&
-      !evaluation.value[ErrorSymbol]
+      // @ts-ignore
+      evaluation.phase === 'value' &&
+      !evaluation.value?.[ErrorSymbol]
     ) {
       displayInlineValue(
         evaluation.e,
         frame,
-        `⇐ ${formatValue(evaluation.value.value)}`,
+        `⇐ ${formatValue(evaluation.value?.value)}`,
+      );
+    } else if (
+      evaluation.e.type === 'ExpressionStatement' &&
+      !evaluation.value?.[ErrorSymbol] &&
+      evaluation.value?.value
+    ) {
+      displayInlineValue(
+        evaluation.e,
+        frame,
+        `= ${formatValue(evaluation.value?.value)}`,
       );
     } else if (
       evaluation.e.type === 'Apply' &&
@@ -438,7 +448,9 @@ export function useEditorState() {
       markEditor(evaluation);
     }
 
-    displayComments(evaluation.e);
+    if (evaluation.phase !== 'exit') {
+      displayComments(evaluation.e);
+    }
   };
 
   const clearPreviousCallsForFrameFn = (

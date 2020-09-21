@@ -18,6 +18,7 @@ import {
   Environment,
 } from 'metaes/types';
 import * as NodeTypes from 'metaes/nodeTypes';
+import { ErrorSymbol } from './engine';
 
 function deferred() {
   let resolve: (v: unknown) => void,
@@ -115,14 +116,22 @@ export const evaluateMetaFunction = (
             // use implicit return only if function is arrow function and have expression as a body
             if (returnDeferred) {
               returnDeferred.resolve(value);
-              cerr({ type: 'AsyncEnd' });
+              cerr({
+                type: 'AsyncEnd',
+                value,
+                [ErrorSymbol]: true,
+              });
             } else {
               returnDeferred;
             }
           } else {
             // ignore what was evaluated in function body, return statement in error continuation should carry the value
             if (returnDeferred) {
-              cerr({ type: 'AsyncEnd' });
+              cerr({
+                type: 'AsyncEnd',
+                value,
+                [ErrorSymbol]: true,
+              });
             } else {
               c(undefined);
             }
@@ -132,7 +141,11 @@ export const evaluateMetaFunction = (
           if (exception.type === 'ReturnStatement') {
             if (returnDeferred) {
               returnDeferred.resolve(exception.value);
-              cerr({ type: 'AsyncEnd' });
+              cerr({
+                type: 'AsyncEnd',
+                value: exception.value,
+                [ErrorSymbol]: true,
+              });
             } else {
               c(exception.value);
             }
@@ -260,3 +273,31 @@ export function FunctionDeclaration(
     cerr(LocatedError(error, e));
   }
 }
+
+export const AwaitExpression = (
+  e: {
+    argument: NodeTypes.ExpressionStatement;
+  },
+  c: Continuation,
+  cerr: ErrorContinuation,
+  env: Environment,
+  config: EvaluationConfig,
+) => {
+  evaluate(
+    e.argument,
+    (value) => {
+      if (value instanceof Promise) {
+        cerr({
+          type: 'AwaitExpression',
+          value: value,
+          [ErrorSymbol]: true,
+        });
+      } else {
+        c(value);
+      }
+    },
+    cerr,
+    env,
+    config,
+  );
+};

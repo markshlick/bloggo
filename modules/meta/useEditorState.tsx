@@ -93,6 +93,9 @@ const Comment = ({ node }: { node: ASTNode }) => (
     <p>
       <em>{filler}</em>
     </p>
+    <pre style={{ overflow: 'scroll' }}>
+      {JSON.stringify(node, null, '\t')}
+    </pre>
   </div>
 );
 
@@ -331,6 +334,13 @@ export function useEditorState() {
     frame: StackFrame,
     context: EvaluationContext,
   ) => {
+    // console.log(
+    //   evaluation.e.type,
+    //   evaluation,
+    //   frame,
+    //   context,
+    // );
+
     if (
       evaluation.e.type === 'Program' &&
       evaluation.phase === 'exit'
@@ -400,6 +410,7 @@ export function useEditorState() {
       );
     } else if (
       evaluation.e.type === 'ExpressionStatement' &&
+      evaluation.value?.type !== 'ThrowStatement' &&
       !evaluation.value?.[ErrorSymbol] &&
       evaluation.value?.value
     ) {

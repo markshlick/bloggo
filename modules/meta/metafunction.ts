@@ -274,6 +274,46 @@ export function FunctionDeclaration(
   }
 }
 
+const EXCEPTION_NAME = '/exception';
+
+export function TryStatement(
+  e: NodeTypes.TryStatement,
+  c: Continuation,
+  cerr: ErrorContinuation,
+  env: Environment,
+  config: EvaluationConfig,
+) {
+  evaluate(
+    e.block,
+    c,
+    (exception) => {
+      if (exception.type === 'AwaitExpression') {
+        cerr(exception);
+        return;
+      }
+
+      return evaluate(
+        e.handler,
+        () =>
+          e.finalizer
+            ? evaluate(e.finalizer, c, cerr, env, config)
+            : // @ts-ignore
+              c(),
+        cerr,
+        {
+          values: {
+            [EXCEPTION_NAME]: exception.value || exception,
+          },
+          prev: env,
+        },
+        config,
+      );
+    },
+    env,
+    config,
+  );
+}
+
 export const AwaitExpression = (
   e: {
     argument: NodeTypes.ExpressionStatement;

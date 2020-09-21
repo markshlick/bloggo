@@ -30,6 +30,7 @@ import {
   FunctionExpression,
   FunctionDeclaration,
   AwaitExpression,
+  TryStatement,
 } from 'modules/meta/metafunction';
 
 type Timeout = (fn: () => void, ms: number) => number;
@@ -333,70 +334,76 @@ export function meta({
         node.type
       ];
 
-      interpreter(
-        node,
-        (r: any) => {
-          const context: EvaluationContext = {
-            previousFrame: prevFrame(),
-          };
-          if (
-            node.type === 'AssignmentExpression' &&
-            node.left.type === 'Identifier'
-          ) {
-            context.origin = getOrigin(node.left.name);
-          }
+      const continuation: Continuation = (r: any) => {
+        const context: EvaluationContext = {
+          previousFrame: prevFrame(),
+        };
+        if (
+          node.type === 'AssignmentExpression' &&
+          node.left.type === 'Identifier'
+        ) {
+          context.origin = getOrigin(node.left.name);
+        }
 
-          displayEvaluation(
-            {
-              e: node,
-              // @ts-ignore
-              phase: 'value',
-              value: r,
-              config,
-              env,
-            },
-            currentFrame(),
-            context,
-          );
-
-          if (
-            node.type === 'Program' ||
-            node.type === 'VariableDeclarator' ||
-            node.type === 'AssignmentExpression' ||
-            // FIXME - override node types
+        displayEvaluation(
+          {
+            e: node,
             // @ts-ignore
-            node.type === 'AwaitExpression'
-          ) {
-            enqueue(() => {
-              execState.next = undefined;
-              c(r);
-            });
-          } else {
+            phase: 'value',
+            value: r,
+            config,
+            env,
+          },
+          currentFrame(),
+          context,
+        );
+
+        const shouldWaitOnValuePhase =
+          node.type === 'Program' ||
+          node.type === 'VariableDeclarator' ||
+          node.type === 'AssignmentExpression' ||
+          // FIXME - override node types
+          // @ts-ignore
+          node.type === 'AwaitExpression';
+
+        if (shouldWaitOnValuePhase) {
+          enqueue(() => {
+            execState.next = undefined;
             c(r);
-          }
-        },
-        (err) => {
-          const isAwait =
-            // @ts-ignore
-            node.type === 'AwaitExpression' &&
-            err.value instanceof Promise;
+          });
+        } else {
+          c(r);
+        }
+      };
 
-          const isReturn =
-            node.type === 'ReturnStatement' &&
-            // @ts-ignore
-            err.type === 'ReturnStatement';
+      const errorContinuation: ErrorContinuation = (
+        err,
+      ) => {
+        const isAwait =
+          // @ts-ignore
+          node.type === 'AwaitExpression' &&
+          err.value instanceof Promise;
 
-          if (isAwait) {
-            handleAwait(err.value, (value) => {
+        const isReturn =
+          node.type === 'ReturnStatement' &&
+          // @ts-ignore
+          err.type === 'ReturnStatement';
+
+        const awaitEvaluation: Evaluation = {
+          e: node,
+          // @ts-ignore
+          phase: 'value',
+          value: err,
+          config,
+          env,
+        };
+
+        if (isAwait) {
+          handleAwait(
+            err.value,
+            (value) => {
               displayEvaluation(
-                {
-                  e: node,
-                  // @ts-ignore
-                  phase: 'value',
-                  value: err,
-                  config,
-                  env,
-                },
+                awaitEvaluation,
                 currentFrame(),
                 {},
               );
@@ -404,35 +411,49 @@ export function meta({
                 execState.next = undefined;
                 c(value);
               });
-            });
-          }
+            },
+            (value) => {
+              displayEvaluation(
+                awaitEvaluation,
+                currentFrame(),
+                {},
+              );
+              enqueue(() => {
+                execState.next = undefined;
+                cerr({
+                  type: 'ThrowStatement',
+                  value: value,
+                  location: node,
+                });
+              });
+            },
+          );
+        }
 
-          if (
-            // @ts-ignore
-            isAwait ||
-            isReturn
-          ) {
-            displayEvaluation(
-              {
-                e: node,
-                // @ts-ignore
-                phase: 'value',
-                value: err,
-                config,
-                env,
-              },
-              currentFrame(),
-              {},
-            );
+        if (
+          // @ts-ignore
+          isAwait ||
+          isReturn
+        ) {
+          displayEvaluation(
+            awaitEvaluation,
+            currentFrame(),
+            {},
+          );
 
-            enqueue(() => {
-              execState.next = undefined;
-              cerr(err);
-            });
-          } else {
+          enqueue(() => {
+            execState.next = undefined;
             cerr(err);
-          }
-        },
+          });
+        } else {
+          cerr(err);
+        }
+      };
+
+      interpreter(
+        node,
+        continuation,
+        errorContinuation,
         env,
         config,
       );
@@ -442,7 +463,7 @@ export function meta({
     const isApplyWithoutMetaFn =
       node.type === 'Apply' && !getMetaFunction(node.fn)?.e;
 
-    if (
+    const shouldSkipWaitOnEnterPhase =
       // HACK: Program statements (not interesting) are handled as BlockStatements by the interpreter
       node.type === 'Program' ||
       node.type === 'VariableDeclarator' ||
@@ -451,8 +472,9 @@ export function meta({
       node.type === 'ExpressionStatement' ||
       // @ts-ignore
       node.type === 'AwaitExpression' ||
-      isApplyWithoutMetaFn
-    ) {
+      isApplyWithoutMetaFn;
+
+    if (shouldSkipWaitOnEnterPhase) {
       next();
     } else {
       enqueue(next);
@@ -469,6 +491,7 @@ export function meta({
       FunctionExpression,
       FunctionDeclaration,
       AwaitExpression,
+      TryStatement,
     };
   };
 
@@ -522,12 +545,12 @@ export function meta({
   };
 
   const updateStackState = (evaluation: Evaluation) => {
-    console.log(
-      evaluation.e.type,
-      evaluation,
-      currentFrame(),
-      currentBlock(),
-    );
+    // console.log(
+    //   evaluation.e.type,
+    //   evaluation,
+    //   currentFrame(),
+    //   currentBlock(),
+    // );
 
     const evaluationType = evaluation.e.type;
     if (blockScopeTypes.includes(evaluationType)) {
@@ -745,18 +768,28 @@ export function meta({
   const handleAwait = (
     promise: Promise<unknown>,
     c: Continuation,
+    cerr: ErrorContinuation,
   ) => {
     const stack = [...execState.callStack];
     // execState.awaitCount++;
     execState.inFlightPromises.add(promise);
-    promise.then((value: unknown) => {
-      // execState.awaitCount--;
-      execState.inFlightPromises.delete(promise);
-      execState.callbackQueue.push(() => {
-        execState.callStack = stack;
-        c(value);
-      });
-    });
+    promise.then(
+      (value: unknown) => {
+        // execState.awaitCount--;
+        execState.inFlightPromises.delete(promise);
+        execState.callbackQueue.push(() => {
+          execState.callStack = stack;
+          c(value);
+        });
+      },
+      (error) => {
+        execState.inFlightPromises.delete(promise);
+        execState.callbackQueue.push(() => {
+          execState.callStack = stack;
+          cerr(error);
+        });
+      },
+    );
   };
 
   const maybeEndExec = () => {

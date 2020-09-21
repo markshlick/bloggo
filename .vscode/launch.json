@@ -38,7 +38,12 @@
   "compounds": [
     {
       "name": "Fullstack",
-      "configurations": ["Launch Node", "Node", "Chrome"]
+      "configurations": ["Launch Node", "Node", "Chrome"],
+      "presentation": {
+        "hidden": false,
+        "group": "Debug",
+        "order": 2
+      }
     },
     {
       "name": "Frontend",
@@ -46,7 +51,12 @@
         "Launch Node",
         // "Node",
         "Chrome"
-      ]
+      ],
+      "presentation": {
+        "hidden": false,
+        "group": "Debug",
+        "order": 1
+      }
     }
   ]
 }

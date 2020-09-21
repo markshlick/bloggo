@@ -415,10 +415,10 @@ export function useEditorState() {
       editorItemsRef.current.commentLineWidget?.clear();
 
       const metaFn = getMetaFunction(evaluation.e.fn)?.e;
-      if (!metaFn) return;
-
-      const prevNodes = getFrameWidgets(frame);
-      prevNodes?.forEach((node) => node.attach());
+      if (metaFn) {
+        const prevNodes = getFrameWidgets(frame);
+        prevNodes?.forEach((node) => node.attach());
+      }
     } else if (
       evaluation.e.type === 'Apply' &&
       // @ts-ignore
@@ -440,17 +440,17 @@ export function useEditorState() {
       clearPreviousCallsForFrameFn(frame);
 
       const metaFn = getMetaFunction(evaluation.e.fn)?.e;
-      if (!metaFn) return;
+      if (metaFn) {
+        displayComments(metaFn);
 
-      displayComments(metaFn);
+        displayInlineValue(
+          metaFn,
+          frame,
+          `(${evaluation.e.args.join(', ')})`,
+        );
 
-      displayInlineValue(
-        metaFn,
-        frame,
-        `(${evaluation.e.args.join(', ')})`,
-      );
-
-      markEditor({ ...evaluation, e: metaFn });
+        markEditor({ ...evaluation, e: metaFn.id });
+      }
     }
 
     if (evaluation.e.loc) {

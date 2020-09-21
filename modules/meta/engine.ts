@@ -637,14 +637,13 @@ export function meta({
 
         frame.values = { ...frame.values, ...values };
       } else {
-        let env = evaluation.env;
-
-        // HACK
-        // @ts-ignore
-        while (env && env !== frame.env) {
-          frame.values = { ...frame.values, ...env.values };
-          env = env.prev;
-        }
+        // let env = evaluation.env;
+        // // HACK
+        // // @ts-ignore
+        // while (env && env !== frame.env) {
+        //   frame.values = { ...frame.values, ...env.values };
+        //   env = env.prev;
+        // }
       }
     }
 

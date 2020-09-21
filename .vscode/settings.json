@@ -4,5 +4,13 @@
     "!typescriptreact",
     "!typescript",
     "mdx"
+  ],
+  "cSpell.ignorePaths": [
+    "**/package-lock.json",
+    "**/node_modules/**",
+    "**/vscode-extension/**",
+    "**/.git/objects/**",
+    "**/.vscode/**",
+    "**/tsconfig.json"
   ]
 }

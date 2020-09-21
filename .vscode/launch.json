@@ -1,0 +1,52 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch Node",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/next/dist/bin/next",
+      "env": {
+        "NODE_OPTIONS": "--inspect"
+      },
+      "port": 9229,
+      "console": "internalConsole"
+    },
+    {
+      "type": "node",
+      "request": "attach",
+      "name": "Node",
+      "skipFiles": ["<node_internals>/**"],
+      "port": 9229
+    },
+    {
+      "type": "chrome",
+      "request": "launch",
+      "name": "Chrome",
+      "url": "http://localhost:3000/meta"
+    }
+    // // TODO: Workflow for attaching to running chrome
+    // {
+    //   "type": "chrome",
+    //   "request": "attach",
+    //   "port": 9222,
+    //   "name": "Attach Running Chrome",
+    //   "url": "http://localhost:3000/",
+    //   "webRoot": "${workspaceFolder}"
+    // }
+  ],
+  "compounds": [
+    {
+      "name": "Fullstack",
+      "configurations": ["Launch Node", "Node", "Chrome"]
+    },
+    {
+      "name": "Frontend",
+      "configurations": [
+        "Launch Node",
+        // "Node",
+        "Chrome"
+      ]
+    }
+  ]
+}

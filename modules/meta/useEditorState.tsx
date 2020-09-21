@@ -185,15 +185,15 @@ export function useEditorState() {
     return frameVal.widgets;
   };
 
-  const resetFrameWidgets = (frame: StackFrame) => {
-    const nodes = getFrameWidgets(frame);
-    nodes?.forEach((node) => node.remove());
+  // const resetFrameWidgets = (frame: StackFrame) => {
+  //   const nodes = getFrameWidgets(frame);
+  //   nodes?.forEach((node) => node.remove());
 
-    editorItemsRef.current.editorWidgetsByFrame.set(
-      frame.id,
-      { widgets: new Map(), frame },
-    );
-  };
+  //   editorItemsRef.current.editorWidgetsByFrame.set(
+  //     frame.id,
+  //     { widgets: new Map(), frame },
+  //   );
+  // };
 
   const displayReactElementValue = (
     node: ASTNode,
@@ -332,23 +332,17 @@ export function useEditorState() {
     frame: StackFrame,
     context: EvaluationContext,
   ) => {
-    const isInteresting = interestingTypes.includes(
-      evaluation.e.type,
-    );
-
     if (
-      evaluation.phase === 'exit' &&
-      evaluation.e.type === 'Program'
+      evaluation.e.type === 'Program' &&
+      evaluation.phase === 'exit'
     ) {
       editorItemsRef.current.commentLineWidget?.clear();
       editorItemsRef.current.reactLineWidget?.clear();
       editorItemsRef.current.marker?.clear();
-    }
-
-    if (
+    } else if (
+      evaluation.e.type === 'AssignmentExpression' &&
       // @ts-ignore
-      evaluation.phase === 'value' &&
-      evaluation.e.type === 'AssignmentExpression'
+      evaluation.phase === 'value'
     ) {
       if (
         // @ts-ignore
@@ -374,26 +368,10 @@ export function useEditorState() {
           `= ${formatValue(evaluation.value)}`,
         );
       }
-    }
-
-    if (
+    } else if (
+      evaluation.e.type === 'VariableDeclarator' &&
       // @ts-ignore
-      evaluation.phase === 'value' &&
-      evaluation.e.type === 'AssignmentExpression' &&
-      evaluation.e.left.type === 'Identifier' &&
-      frame.origins[evaluation.e.left.name]
-    ) {
-      displayInlineValue(
-        frame.origins[evaluation.e.left.name],
-        frame,
-        `= ${formatValue(evaluation.value)}`,
-      );
-    }
-
-    if (
-      // @ts-ignore
-      evaluation.phase === 'value' &&
-      evaluation.e.type === 'VariableDeclarator'
+      evaluation.phase === 'value'
     ) {
       if (
         // @ts-ignore
@@ -410,11 +388,9 @@ export function useEditorState() {
         frame,
         `= ${formatValue(evaluation.value)}`,
       );
-    }
-
-    if (
-      evaluation.phase === 'exit' &&
+    } else if (
       evaluation.e.type === 'ReturnStatement' &&
+      evaluation.phase === 'exit' &&
       !evaluation.value[ErrorSymbol]
     ) {
       displayInlineValue(
@@ -422,30 +398,47 @@ export function useEditorState() {
         frame,
         `⇐ ${formatValue(evaluation.value.value)}`,
       );
-    }
-
-    if (
-      evaluation.phase === 'enter' &&
-      evaluation.e.type === 'Program'
+    } else if (
+      evaluation.e.type === 'Apply' &&
+      evaluation.phase === 'exit'
     ) {
-      resetFrameWidgets(frame);
-    }
+      editorItemsRef.current.commentLineWidget?.clear();
+      clearPreviousCallsForFrameFn(frame);
 
-    if (isInteresting && evaluation.phase === 'enter') {
-      displayComments(evaluation.e);
-    }
+      const metaFn = getMetaFunction(evaluation.e.fn)?.e;
+      if (!metaFn) return;
 
-    if (
-      evaluation.e.type === 'AwaitExpression' &&
+      const prevNodes = getFrameWidgets(frame);
+      prevNodes?.forEach((node) => node.attach());
+    } else if (
+      evaluation.e.type === 'Apply' &&
       // @ts-ignore
-      evaluation.phase === 'value'
+      evaluation.phase === 'enter-after'
     ) {
-      displayComments(evaluation.e);
+      editorItemsRef.current.commentLineWidget?.clear();
+      // const nodes = getFrameWidgets(prevFrame);
+      // nodes?.forEach((node) => node.remove());
+      clearPreviousCallsForFrameFn(frame);
+
+      const metaFn = getMetaFunction(evaluation.e.fn)?.e;
+      if (!metaFn) return;
+
+      displayComments(metaFn);
+
+      displayInlineValue(
+        metaFn,
+        frame,
+        `(${evaluation.e.args.join(', ')})`,
+      );
+
+      markEditor({ ...evaluation, e: metaFn });
     }
 
-    if (isInteresting) {
+    if (evaluation.e.loc) {
       markEditor(evaluation);
     }
+
+    displayComments(evaluation.e);
   };
 
   const clearPreviousCallsForFrameFn = (
@@ -464,45 +457,6 @@ export function useEditorState() {
         const nodes = getFrameWidgets(frame);
         nodes?.forEach((node) => node.remove());
       });
-  };
-
-  const displayApplyEnter = (
-    evaluation: Evaluation,
-    currFrame: StackFrame,
-    prevFrame: StackFrame,
-  ) => {
-    editorItemsRef.current.commentLineWidget?.clear();
-    // const nodes = getFrameWidgets(prevFrame);
-    // nodes?.forEach((node) => node.remove());
-    clearPreviousCallsForFrameFn(currFrame);
-
-    const metaFn = getMetaFunction(evaluation.e.fn)?.e;
-    if (!metaFn) return;
-
-    displayComments(metaFn);
-
-    displayInlineValue(
-      metaFn,
-      currFrame,
-      `( ${evaluation.e.args.join(', ')} )`,
-    );
-
-    markEditor({ ...evaluation, e: metaFn });
-  };
-
-  const displayApplyExit = (
-    evaluation: Evaluation,
-    frame: StackFrame,
-    prevFrame: StackFrame,
-  ) => {
-    editorItemsRef.current.commentLineWidget?.clear();
-    clearPreviousCallsForFrameFn(prevFrame);
-
-    const metaFn = getMetaFunction(evaluation.e.fn)?.e;
-    if (!metaFn) return;
-
-    const prevNodes = getFrameWidgets(prevFrame);
-    prevNodes?.forEach((node) => node.attach());
   };
 
   const clearCurrentMarker = () => {
@@ -529,8 +483,6 @@ export function useEditorState() {
     getCode,
     clearEditor,
     clearCurrentMarker,
-    displayApplyEnter,
-    displayApplyExit,
     displayEvaluation,
     configEditor,
   };

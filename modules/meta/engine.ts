@@ -29,7 +29,7 @@ import {
   ArrowFunctionExpression,
   FunctionExpression,
   FunctionDeclaration,
-} from 'modules/meta/metafunnction';
+} from 'modules/meta/metafunction';
 
 type Timeout = (fn: () => void, ms: number) => number;
 
@@ -108,21 +108,12 @@ export type Origin = {
 
 export type EvaluationContext = {
   origin?: Origin;
+  previousFrame?: StackFrame[];
 };
 
 export type Engine = {
   speed: number;
   handleError: (err: any) => void;
-  displayApplyEnter: (
-    evaluation: Evaluation,
-    frame: StackFrame,
-    prevFrame: StackFrame,
-  ) => void;
-  displayApplyExit: (
-    evaluation: Evaluation,
-    frame: StackFrame,
-    prevFrame: StackFrame,
-  ) => void;
   displayEvaluation: (
     evaluation: Evaluation,
     frame: StackFrame,
@@ -144,7 +135,7 @@ export const interestingTypes: NodeNames[] = [
   'ForOfStatement',
   'WhileStatement',
   'AwaitExpression',
-  // 'Apply',
+  'Apply',
 ];
 
 const globalObjects = {
@@ -202,8 +193,6 @@ export const ErrorSymbol = (typeof Symbol === 'function'
 export function meta({
   speed,
   handleError,
-  displayApplyEnter,
-  displayApplyExit,
   displayEvaluation,
   update,
 }: Engine) {
@@ -390,11 +379,16 @@ export function meta({
       );
     };
 
+    // TODO: expose this as a callback?
+    const isApplyWithoutMetaFn =
+      node.type === 'Apply' && !getMetaFunction(node.fn)?.e;
+
     if (
       // HACK: Program statements (not interesting) are handled as BlockStatements by the interpreter
       node.type === 'Program' ||
       node.type === 'VariableDeclarator' ||
-      node.type === 'AssignmentExpression'
+      node.type === 'AssignmentExpression' ||
+      isApplyWithoutMetaFn
     ) {
       next();
     } else {
@@ -541,16 +535,29 @@ export function meta({
           ...execState.callsRootImmutableRef,
         ];
 
-        displayApplyEnter(evaluation, frame, prevFrame());
+        displayEvaluation(
+          {
+            ...evaluation,
+            // @ts-ignore
+            phase: 'enter-after',
+          },
+          currentFrame(),
+          { previousFrame: prevFrame() },
+        );
       } else {
         currentFrame().hasReturned = true;
         currentFrame().returnValue = evaluation.value;
 
-        displayApplyExit(
-          evaluation,
+        displayEvaluation(
+          {
+            ...evaluation,
+            // @ts-ignore
+            phase: 'exit-before',
+          },
           currentFrame(),
-          prevFrame(),
+          { previousFrame: prevFrame() },
         );
+
         execState.callStack.pop();
         execState.callsRootImmutableRef = [
           ...execState.callsRootImmutableRef,
@@ -592,9 +599,14 @@ export function meta({
       }
     }
 
-    displayEvaluation(evaluation, currentFrame(), {});
+    const isInteresting = interestingTypes.includes(
+      evaluation.e.type,
+    );
 
-    update();
+    if (isInteresting) {
+      displayEvaluation(evaluation, currentFrame(), {});
+      update();
+    }
   };
 
   const handleSetValue = (

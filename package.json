@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next",
+    "dev_": "next",
+    "dev": "NODE_OPTIONS='--inspect' next",
     "build": "next build && yarn build:rss",
     "build:rss": "node ./scripts/buildRss.js",
-    "export": "next export"
+    "export": "next export",
+    "repl": "ts-node --project tsconfig.repl.json"
   },
   "dependencies": {
     "@auth0/auth0-spa-js": "^1.9.0",
@@ -44,6 +46,7 @@
     "stripe": "^8.56.0",
     "swr": "^0.2.3",
     "theme-ui": "^0.2.41",
+    "ts-node": "^9.0.0",
     "use-spring": "^0.2.3",
     "vanillinjs": "^0.4.0"
   },

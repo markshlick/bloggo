@@ -11,7 +11,7 @@ import {
 } from 'helpers/formatValue';
 import { useEditorState } from 'modules/meta/useEditorState';
 
-import code from '!!raw-loader!samples/async';
+import code from '!!raw-loader!samples/fibonacci';
 
 const Tree = dynamic(import('react-d3-tree'), {
   ssr: false,
@@ -138,8 +138,6 @@ export default function Meta() {
     getCode,
     clearEditor,
     clearCurrentMarker,
-    displayApplyEnter,
-    displayApplyExit,
     displayEvaluation,
     configEditor,
   } = useEditorState();
@@ -147,8 +145,6 @@ export default function Meta() {
   const metaRef = useRef(
     meta({
       speed: defaultSpeed,
-      displayApplyEnter,
-      displayApplyExit,
       displayEvaluation,
       handleError,
       update,
@@ -341,7 +337,8 @@ export default function Meta() {
   return (
     <div style={{ margin: '20px auto', maxWidth: 840 }}>
       <title>
-        Socrates :: Learnable CS with JavaScript
+        The HyperScript Project :: Learnable CS with
+        JavaScript
       </title>
       <div key="editor" className="space">
         <div

@@ -695,15 +695,8 @@ export function meta({
     SetValue(e, c, cerr, env);
   };
 
-  // exec
-
-  const startExec = (code: string) => {
-    if (execState.running) {
-      return;
-    }
-
-    const rootFrame = programFrame();
-    execState.callStack = [rootFrame];
+  const clearState = () => {
+    execState.callStack = [];
     execState.allStackNodes = [];
     execState.watchValues = {};
 
@@ -711,6 +704,19 @@ export function meta({
     // callsRootImmutableRef is an immutable *reference*
     // BUT it's values mutate
     // NOTE - it will not be reassigned if stack frame variable change
+    execState.callsRootImmutableRef = [];
+  };
+
+  // exec
+
+  const startExec = (code: string) => {
+    if (execState.running) {
+      return;
+    }
+
+    clearState();
+    const rootFrame = programFrame();
+    execState.callStack = [rootFrame];
     execState.callsRootImmutableRef = [rootFrame];
 
     execState.running = true;
@@ -794,18 +800,22 @@ export function meta({
   };
 
   const endExec = () => {
+    clearState();
     execState.nextTimer &&
       clearTimeout(execState.nextTimer);
 
     execState.programTimers.forEach((t) => clearTimeout(t));
+    execState.programTimers = new Set();
 
     execState.programIntervals.forEach((t) =>
       clearInterval(t as any),
     );
+    execState.programIntervals = new Set();
 
     execState.autoStepping = false;
     execState.running = false;
     execState.next = undefined;
+    execState.nextTimer = undefined;
 
     update();
   };

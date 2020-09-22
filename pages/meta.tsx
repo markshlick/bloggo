@@ -54,35 +54,14 @@ const GraphNode = ({
 };
 
 export default function Meta() {
-  const [stackState, setStackState] = useState<{
-    stack: StackFrame[];
-    callsRootImmutableRef: StackFrame[];
-    watchValues: WatchValues;
-  }>({
-    stack: [],
-    callsRootImmutableRef: [],
-    watchValues: {},
-  });
-
+  const [_, forceUpdate] = useState({});
+  const update = () => forceUpdate({});
   // editor ui
 
   const clearState = () => {
     clearCurrentMarker();
     clearEditor();
-    setStackState({
-      watchValues: {},
-      stack: [],
-      callsRootImmutableRef: [],
-    });
   };
-
-  const update = () =>
-    setStackState({
-      callsRootImmutableRef:
-        metaRef.current.execState.callsRootImmutableRef,
-      stack: [...metaRef.current.execState.callStack],
-      watchValues: metaRef.current.execState.watchValues,
-    });
 
   // event handlers
 
@@ -160,6 +139,12 @@ export default function Meta() {
       update,
     }),
   );
+
+  const {
+    callsRootImmutableRef,
+    callStack,
+    // watchValues,
+  } = metaRef.current.execState;
 
   // view helpers
 
@@ -256,7 +241,7 @@ export default function Meta() {
           padding: 12,
         }}
       >
-        {[...stackState.stack]
+        {[...callStack]
           .reverse()
           .map(
             (
@@ -286,7 +271,7 @@ export default function Meta() {
                   }}
                 >
                   <h4 className="no-space">
-                    [{stackState.stack.length - i}]{' '}
+                    [{callStack.length - i}]{' '}
                     <em>
                       {fnName}({formatArgs(args)})
                     </em>
@@ -331,14 +316,14 @@ export default function Meta() {
           borderRadius: 4,
         }}
       >
-        {stackState.callsRootImmutableRef.length ? (
+        {callsRootImmutableRef.length ? (
           <Tree
             translate={{ x: 100, y: 100 }}
             zoom={0.5}
             orientation="vertical"
             transitionDuration={0}
             collapsible={false}
-            data={stackState.callsRootImmutableRef}
+            data={callsRootImmutableRef}
             allowForeignObjects
             nodeLabelComponent={{
               foreignObjectWrapper: {

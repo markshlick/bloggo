@@ -10,7 +10,7 @@ import {
 import { meta, StackFrame } from 'modules/meta/engine';
 import { useEditorState } from 'modules/meta/useEditorState';
 
-import code from '!!raw-loader!samples/react';
+import code from '!!raw-loader!samples/async';
 
 const Tree = dynamic(import('react-d3-tree'), {
   ssr: false,

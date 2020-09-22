@@ -69,7 +69,7 @@ type ExecState = {
   watchValues: WatchValues;
   callsRootImmutableRef: StackFrame[];
   programEnvKeys: string[];
-  callbackQueue: Function[];
+  callbackQueue: (() => any)[];
 };
 
 export type BlockFrame = {
@@ -381,7 +381,7 @@ export function meta({
         const awaitEvaluation: Evaluation = {
           e: node,
           // @ts-ignore
-          phase: 'value',
+          phase: 'resume',
           value: err,
           config,
           env,
@@ -425,7 +425,14 @@ export function meta({
           isReturn
         ) {
           emitEvaluation(
-            awaitEvaluation,
+            {
+              e: node,
+              // @ts-ignore
+              phase: isAwait ? 'suspend' : 'value',
+              value: err,
+              config,
+              env,
+            },
             currentFrame(),
             {},
           );
@@ -498,6 +505,8 @@ export function meta({
       const run = () => {
         if (execState.autoStepping) {
           next();
+        } else {
+          update();
         }
       };
 
@@ -766,9 +775,18 @@ export function meta({
   };
 
   const handleEvaluationEnd = () => {
-    if (execState.callbackQueue.length) {
-      const next = execState.callbackQueue.shift();
-      if (next) next();
+    if (execState.next) {
+      return;
+    }
+
+    const nextFn = execState.callbackQueue.shift();
+    if (nextFn !== undefined) {
+      execState.next = nextFn;
+      if (execState.autoStepping) {
+        nextFn();
+      } else {
+        update();
+      }
       return;
     }
 
@@ -776,7 +794,6 @@ export function meta({
       Promise.race(
         Array.from(execState.inFlightPromises.values()),
       ).then(handleEvaluationEnd);
-      return;
     }
 
     // if (
@@ -785,7 +802,6 @@ export function meta({
     //   !execState.callbackQueue.length &&
     //   !execState.next
     // ) {
-    //   endExec();
     // }
   };
 

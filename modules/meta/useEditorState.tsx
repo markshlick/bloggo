@@ -87,7 +87,13 @@ export function createWidget(
   return display();
 }
 
-const Comment = ({ node }: { node: ASTNode }) => (
+const Comment = ({
+  node,
+  evaluation,
+}: {
+  node: ASTNode;
+  evaluation: Evaluation;
+}) => (
   <div
     style={{
       padding: '18px 36px',
@@ -99,7 +105,9 @@ const Comment = ({ node }: { node: ASTNode }) => (
       overflow: 'scroll',
     }}
   >
-    <h2>{node.type}</h2>
+    <h2>
+      {node.type}: {evaluation.phase}
+    </h2>
     <p>
       <em>{filler}</em>
     </p>
@@ -268,7 +276,10 @@ export function useEditorState() {
     return l;
   };
 
-  const displayComments = (node: ASTNode) => {
+  const displayComments = (
+    node: ASTNode,
+    evaluation: Evaluation,
+  ) => {
     const loc = astToCmLoc(node);
     const editor = editorRef.current;
     if (!loc || !editor) return;
@@ -276,7 +287,10 @@ export function useEditorState() {
     const { line } = loc.start;
 
     const l = document.createElement('div');
-    render(<Comment node={node} />, l);
+    render(
+      <Comment node={node} evaluation={evaluation} />,
+      l,
+    );
 
     editorItemsRef.current.commentLineWidget?.clear();
     editorItemsRef.current.reactLineWidget?.clear();
@@ -348,15 +362,14 @@ export function useEditorState() {
       context,
     );
 
-    if (evaluation.e.loc) {
-      markEditor(evaluation);
-    }
-
     if (
       evaluation.phase !== 'exit' &&
       evaluation.e.type !== 'ExpressionStatement'
     ) {
-      displayComments(evaluation.e);
+      if (evaluation.e.loc) {
+        markEditor(evaluation);
+      }
+      displayComments(evaluation.e, evaluation);
     }
 
     if (
@@ -470,7 +483,7 @@ export function useEditorState() {
 
       const metaFn = getMetaFunction(evaluation.e.fn)?.e;
       if (metaFn) {
-        displayComments(metaFn);
+        displayComments(metaFn, evaluation);
 
         displayInlineValue(
           metaFn,

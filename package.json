@@ -51,7 +51,7 @@
   },
   "devDependencies": {
     "@types/mousetrap": "^1.6.3",
-    "@types/node": "^14.11.1",
+    "@types/node": "^14.11.2",
     "@types/react": "^16.9.49",
     "@types/react-modal": "^3.10.6",
     "@types/rss": "^0.0.28",

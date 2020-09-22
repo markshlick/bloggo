@@ -459,10 +459,10 @@ export function meta({
       );
     };
 
-    // TODO: expose this as a callback?
     const isApplyWithoutMetaFn =
       node.type === 'Apply' && !getMetaFunction(node.fn)?.e;
 
+    // TODO: expose this as a callback?
     const shouldSkipWaitOnEnterPhase =
       // HACK: Program statements (not interesting) are handled as BlockStatements by the interpreter
       node.type === 'Program' ||

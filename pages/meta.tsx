@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { Editor } from 'codemirror';
+
 import {
   meta,
   StackFrame,
@@ -65,6 +67,7 @@ export default function Meta() {
   // editor ui
 
   const clearState = () => {
+    clearCurrentMarker();
     clearEditor();
     setStackState({
       watchValues: {},
@@ -116,12 +119,11 @@ export default function Meta() {
     const autoStepping =
       metaRef.current.execState.autoStepping;
     metaRef.current.endExec();
-    clearCurrentMarker();
     metaRef.current.execState.autoStepping = autoStepping;
+    clearState();
 
     const code = getCode();
     if (code) {
-      clearState();
       metaRef.current.startExec(code);
       update();
     }
@@ -130,8 +132,16 @@ export default function Meta() {
   const handleExit = () => {
     metaRef.current.endExec();
     clearCurrentMarker();
+    clearState();
 
     update();
+  };
+
+  const handleEditorDidMount = (editor: Editor) => {
+    configEditor(editor);
+    editor.on('change', () => {
+      handleExit();
+    });
   };
 
   const {
@@ -156,10 +166,10 @@ export default function Meta() {
   const editorEl = (
     <CodeEditor
       key="code"
-      editorDidMount={configEditor}
+      editorDidMount={handleEditorDidMount}
       value={code}
       options={{
-        readOnly: metaRef.current.execState.running,
+        // readOnly: metaRef.current.execState.running,
         lineNumbers: true,
       }}
     />
@@ -169,7 +179,11 @@ export default function Meta() {
     <div className="space-small">
       <button
         className="small"
-        disabled={metaRef.current.execState.autoStepping}
+        disabled={
+          metaRef.current.execState.autoStepping ||
+          (metaRef.current.execState.running &&
+            !metaRef.current.execState.next)
+        }
         onClick={handleStep}
       >
         Step
@@ -177,7 +191,11 @@ export default function Meta() {
       {' | '}
       <button
         className="small"
-        disabled={metaRef.current.execState.autoStepping}
+        disabled={
+          metaRef.current.execState.autoStepping ||
+          (metaRef.current.execState.running &&
+            !metaRef.current.execState.next)
+        }
         onClick={handleAutoStep}
       >
         Auto-step

@@ -227,7 +227,7 @@ export function meta({
 
   const exceptionHandler = (exception: any) => {
     if (exception.type === 'AsyncEnd') {
-      maybeEndExec();
+      handleEvaluationEnd();
     } else {
       handleError(exception);
     }
@@ -239,7 +239,7 @@ export function meta({
 
       evaluate(
         { e, fn, type: 'Apply', args: [] },
-        maybeEndExec,
+        handleEvaluationEnd,
         exceptionHandler,
         closure,
         config,
@@ -748,7 +748,7 @@ export function meta({
 
     parseAndEvaluate(
       code,
-      maybeEndExec,
+      handleEvaluationEnd,
       exceptionHandler,
       programEnv,
       {
@@ -792,7 +792,7 @@ export function meta({
     );
   };
 
-  const maybeEndExec = () => {
+  const handleEvaluationEnd = () => {
     if (execState.callbackQueue.length) {
       const next = execState.callbackQueue.shift();
       if (next) next();
@@ -802,18 +802,18 @@ export function meta({
     if (execState.inFlightPromises.size) {
       Promise.race(
         Array.from(execState.inFlightPromises.values()),
-      ).then(maybeEndExec);
+      ).then(handleEvaluationEnd);
       return;
     }
 
-    if (
-      !execState.programTimers.size &&
-      !execState.programIntervals.size &&
-      !execState.callbackQueue.length &&
-      !execState.next
-    ) {
-      endExec();
-    }
+    // if (
+    //   !execState.programTimers.size &&
+    //   !execState.programIntervals.size &&
+    //   !execState.callbackQueue.length &&
+    //   !execState.next
+    // ) {
+    //   endExec();
+    // }
   };
 
   const endExec = () => {
@@ -837,7 +837,7 @@ export function meta({
     if (execState.next) {
       execState.next();
     } else {
-      maybeEndExec();
+      handleEvaluationEnd();
     }
   };
 
@@ -848,7 +848,7 @@ export function meta({
     execState,
     currentFrame,
     startExec,
-    maybeEndExec,
+    handleEvaluationEnd,
     endExec,
     progressExec,
     setSpeed,

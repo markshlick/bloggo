@@ -93,9 +93,9 @@ const Comment = ({ node }: { node: ASTNode }) => (
     <p>
       <em>{filler}</em>
     </p>
-    <pre style={{ overflow: 'scroll' }}>
+    {/* <pre style={{ overflow: 'scroll' }}>
       {JSON.stringify(node, null, '\t')}
-    </pre>
+    </pre> */}
   </div>
 );
 
@@ -137,9 +137,6 @@ export function useEditorState() {
   });
 
   const configEditor = (editor: Editor) => {
-    editor.on('change', () => {
-      clearEditor();
-    });
     editorRef.current = editor;
   };
 
@@ -468,7 +465,10 @@ export function useEditorState() {
       markEditor(evaluation);
     }
 
-    if (evaluation.phase !== 'exit') {
+    if (
+      evaluation.phase !== 'exit' &&
+      evaluation.e.type !== 'ExpressionStatement'
+    ) {
       displayComments(evaluation.e);
     }
   };

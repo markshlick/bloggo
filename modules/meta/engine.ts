@@ -117,7 +117,7 @@ export type EvaluationContext = {
 export type Engine = {
   speed: number;
   handleError: (err: any) => void;
-  displayEvaluation: (
+  onEvaluation: (
     evaluation: Evaluation,
     frame: StackFrame,
     context: EvaluationContext,
@@ -219,7 +219,7 @@ export const ErrorSymbol = (typeof Symbol === 'function'
 export function meta({
   speed,
   handleError,
-  displayEvaluation,
+  onEvaluation,
   update,
 }: Engine) {
   // helpers
@@ -250,7 +250,7 @@ export function meta({
     // @ts-ignore
     if (!evaluation.config.external) {
       try {
-        displayEvaluation(evaluation, frame, context);
+        onEvaluation(evaluation, frame, context);
       } catch (error) {}
     }
   };

@@ -350,7 +350,7 @@ export function useEditorState() {
     frameWidgets.set(key, el);
   };
 
-  const displayEvaluation = (
+  const onEvaluation = (
     evaluation: Evaluation,
     frame: StackFrame,
     context: EvaluationContext,
@@ -544,7 +544,7 @@ export function useEditorState() {
     getCode,
     clearEditor,
     clearCurrentMarker,
-    displayEvaluation,
+    onEvaluation,
     configEditor,
   };
 }

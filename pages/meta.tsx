@@ -157,14 +157,14 @@ export default function Meta() {
     getCode,
     clearEditor,
     clearCurrentMarker,
-    displayEvaluation,
+    onEvaluation,
     configEditor,
   } = useEditorState();
 
   const metaRef = useRef(
     meta({
       speed: defaultSpeed,
-      displayEvaluation,
+      onEvaluation,
       handleError,
       update,
     }),

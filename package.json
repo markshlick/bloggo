@@ -28,6 +28,7 @@
     "esprima": "^4.0.1",
     "lodash": "^4.17.20",
     "metaes": "^3.0.0",
+    "mousetrap": "^1.6.5",
     "next": "^9.5.3",
     "prismjs": "^1.21.0",
     "raw-loader": "^4.0.1",
@@ -49,6 +50,7 @@
     "vanillinjs": "^0.4.0"
   },
   "devDependencies": {
+    "@types/mousetrap": "^1.6.3",
     "@types/node": "^14.11.1",
     "@types/react": "^16.9.49",
     "@types/react-modal": "^3.10.6",

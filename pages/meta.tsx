@@ -1,19 +1,16 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Editor } from 'codemirror';
+import Mousetrap from 'mousetrap';
 
-import {
-  meta,
-  StackFrame,
-  WatchValues,
-} from 'modules/meta/engine';
 import {
   formatArgs,
   formatValue,
 } from 'helpers/formatValue';
+import { meta, StackFrame } from 'modules/meta/engine';
 import { useEditorState } from 'modules/meta/useEditorState';
 
-import code from '!!raw-loader!samples/oo';
+import code from '!!raw-loader!samples/react';
 
 const Tree = dynamic(import('react-d3-tree'), {
   ssr: false,
@@ -56,6 +53,34 @@ const GraphNode = ({
 export default function Meta() {
   const [_, forceUpdate] = useState({});
   const update = () => forceUpdate({});
+
+  useEffect(() => {
+    const withCapture = (fn: Function) => {
+      return (e: Event) => {
+        if (e.preventDefault) {
+          e.preventDefault();
+        } else {
+          // internet explorer
+          e.returnValue = false;
+        }
+        fn();
+      };
+    };
+    Mousetrap.bind('mod+s', withCapture(handleStep));
+    Mousetrap.bind('mod+a', withCapture(handleAutoStep));
+    Mousetrap.bind(
+      'mod+d',
+      withCapture(handleAutoStepPause),
+    );
+    Mousetrap.bind('mod+x', withCapture(handleExit));
+    Mousetrap.bind('mod+z', withCapture(handleRestart));
+    return () => {
+      'sadxz'
+        .split('')
+        .forEach((c) => Mousetrap.unbind('mod+' + c));
+    };
+  }, []);
+
   // editor ui
 
   const clearState = () => {
@@ -79,22 +104,26 @@ export default function Meta() {
   };
 
   const handleStep = () => {
+    if (isStepDisabled()) return;
     nextStep();
     update();
   };
 
   const handleAutoStep = () => {
+    if (isStepDisabled()) return;
     metaRef.current.execState.autoStepping = true;
     nextStep();
     update();
   };
 
   const handleAutoStepPause = () => {
+    if (isPauseDisabled()) return;
     metaRef.current.execState.autoStepping = false;
     update();
   };
 
   const handleRestart = () => {
+    if (isExitDisabled()) return;
     const autoStepping =
       metaRef.current.execState.autoStepping;
     metaRef.current.endExec();
@@ -109,6 +138,7 @@ export default function Meta() {
   };
 
   const handleExit = () => {
+    if (isExitDisabled()) return;
     metaRef.current.endExec();
     clearCurrentMarker();
     clearState();
@@ -160,52 +190,60 @@ export default function Meta() {
     />
   );
 
+  const isStepDisabled = () => {
+    return (
+      metaRef.current.execState.autoStepping ||
+      (metaRef.current.execState.running &&
+        !metaRef.current.execState.next)
+    );
+  };
+
+  const isPauseDisabled = () => {
+    return !metaRef.current.execState.autoStepping;
+  };
+
+  const isExitDisabled = () => {
+    return !metaRef.current.execState.running;
+  };
+
   const buttonsEl = (
     <div className="space-small">
       <button
-        className="small"
-        disabled={
-          metaRef.current.execState.autoStepping ||
-          (metaRef.current.execState.running &&
-            !metaRef.current.execState.next)
-        }
+        className="smaller"
+        disabled={isStepDisabled()}
         onClick={handleStep}
       >
-        Step
+        Step (&#8984;S)
       </button>
       {' | '}
       <button
-        className="small"
-        disabled={
-          metaRef.current.execState.autoStepping ||
-          (metaRef.current.execState.running &&
-            !metaRef.current.execState.next)
-        }
+        className="smaller"
+        disabled={isStepDisabled()}
         onClick={handleAutoStep}
       >
-        Auto-step
+        Auto-step (&#8984;A)
       </button>{' '}
       <button
-        className="small"
-        disabled={!metaRef.current.execState.autoStepping}
+        className="smaller"
+        disabled={isPauseDisabled()}
         onClick={handleAutoStepPause}
       >
-        Pause
+        Pause (&#8984;D)
       </button>
       {' | '}
       <button
-        className="small"
-        disabled={!metaRef.current.execState.running}
+        className="smaller"
+        disabled={isExitDisabled()}
         onClick={handleRestart}
       >
-        Restart
+        Restart (&#8984;Z)
       </button>{' '}
       <button
-        className="small"
-        disabled={!metaRef.current.execState.running}
+        className="smaller"
+        disabled={isExitDisabled()}
         onClick={handleExit}
       >
-        Exit
+        Exit (&#8984;X)
       </button>
     </div>
   );
@@ -340,8 +378,7 @@ export default function Meta() {
   return (
     <div style={{ margin: '20px auto', maxWidth: 840 }}>
       <title>
-        The HyperScript Project :: Learnable CS with
-        JavaScript
+        HyperScript :: Learnable CS with JavaScript
       </title>
       <div key="editor" className="space">
         <div

@@ -50,22 +50,23 @@ const GraphNode = ({
   );
 };
 
+const withCapture = (fn: Function) => {
+  return (e: Event) => {
+    if (e.preventDefault) {
+      e.preventDefault();
+    } else {
+      // internet explorer
+      e.returnValue = false;
+    }
+    fn();
+  };
+};
+
 export default function Meta() {
   const [_, forceUpdate] = useState({});
   const update = () => forceUpdate({});
 
   useEffect(() => {
-    const withCapture = (fn: Function) => {
-      return (e: Event) => {
-        if (e.preventDefault) {
-          e.preventDefault();
-        } else {
-          // internet explorer
-          e.returnValue = false;
-        }
-        fn();
-      };
-    };
     Mousetrap.bind('mod+s', withCapture(handleStep));
     Mousetrap.bind('mod+a', withCapture(handleAutoStep));
     Mousetrap.bind(

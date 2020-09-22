@@ -338,6 +338,17 @@ export function useEditorState() {
     //   context,
     // );
 
+    if (evaluation.e.loc) {
+      markEditor(evaluation);
+    }
+
+    if (
+      evaluation.phase !== 'exit' &&
+      evaluation.e.type !== 'ExpressionStatement'
+    ) {
+      displayComments(evaluation.e);
+    }
+
     if (
       evaluation.e.type === 'Program' &&
       evaluation.phase === 'exit'
@@ -459,17 +470,6 @@ export function useEditorState() {
 
         markEditor({ ...evaluation, e: metaFn.id });
       }
-    }
-
-    if (evaluation.e.loc) {
-      markEditor(evaluation);
-    }
-
-    if (
-      evaluation.phase !== 'exit' &&
-      evaluation.e.type !== 'ExpressionStatement'
-    ) {
-      displayComments(evaluation.e);
     }
   };
 

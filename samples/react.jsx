@@ -15,8 +15,10 @@ function Hello({ name }) {
   );
 }
 
-const x = <Hello name="world" />;
+const a = <div>hello</div>;
 
-const y = (
-  <div style={{ border: '2px blue solid' }}>{x}</div>
+const b = <Hello name="world" />;
+
+const c = (
+  <div style={{ border: '2px blue solid' }}>{b}</div>
 );

@@ -1,3 +1,4 @@
+import { debug } from 'console';
 import { noop } from 'metaes';
 import { evaluate, visitArray } from 'metaes/evaluate';
 import { ECMAScriptInterpreters } from 'metaes/interpreters';
@@ -175,39 +176,13 @@ const jsxInterpreters = {
                 ? { type: 'Literal', value: tagName }
                 : { type: 'Identifier', name: tagName },
               (tag) => {
-                const mfn = getMetaFunction(tag);
-                const fn = createMetaFunctionWrapper({
-                  ...mfn,
-                  config: {
-                    interceptor: noop,
-                    interpreters: {
-                      prev: ECMAScriptInterpreters,
-                      values: {
-                        ...jsxInterpreters,
-                      },
-                    },
-                  },
-                });
-
                 const el = createElement(
                   tag,
                   attributes,
                   ...children,
                 );
 
-                const fakeEl = {
-                  ...el,
-                  type: (props: any) => {
-                    const e = createElement(
-                      isCompat ? tag : fn,
-                      props,
-                    );
-
-                    return e;
-                  },
-                };
-
-                c(fakeEl);
+                c(el);
               },
               cerr,
               env,

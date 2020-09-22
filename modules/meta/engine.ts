@@ -219,6 +219,17 @@ export function meta({
     callsRootImmutableRef: [],
   };
 
+  const emitEvaluation = (
+    evaluation: Evaluation,
+    frame: StackFrame,
+    context: EvaluationContext,
+  ) => {
+    // @ts-ignore
+    if (!evaluation.config.external) {
+      displayEvaluation(evaluation, frame, context);
+    }
+  };
+
   const currentFrame = () =>
     execState.callStack[execState.callStack.length - 1];
 
@@ -246,78 +257,27 @@ export function meta({
       );
     };
 
-    return liftedAll({
-      createElement: (
-        [tag, ...rest]: [any, any[]],
-        c: (next: any) => void,
-        cerr: (next: any) => void,
-      ) => {
-        const el = createElement(tag, ...rest);
-
-        const mfn = getMetaFunction(tag);
-        const fn = createMetaFunctionWrapper({
-          ...mfn,
-          config: {
-            interceptor: noop,
-            interpreters: {
-              prev: { values: getInterpreters() },
-              values: {
-                ...makeNodeHandlers(interestingTypes),
-              },
-            },
-          },
-        });
-
-        const fakeEl = {
-          ...el,
-          type: () => {
-            return createElement(fn, ...rest);
-          },
-        };
-
-        c(fakeEl);
-      },
+    return {
       clearTimeout: (timer: number, c: () => void) => {
         execState.programTimers.delete(timer);
         clearTimeout(timer);
         c();
       },
-      clearInterval: (timer: number, c: () => void) => {
-        execState.programIntervals.delete(timer);
-        clearInterval(timer);
-        c();
-      },
-      setTimeout: function (
-        [fn, ms]: [() => void, number],
-        c: (next: any) => void,
-      ) {
+      setTimeout: function (fn: Function, ms: number) {
         const timer = (setTimeout as Timeout)(() => {
           execState.programTimers.delete(timer);
 
           execState.callbackQueue.push(() => {
             runMetaFunction(fn);
           });
+
+          handleEvaluationEnd();
         }, ms);
 
         execState.programTimers.add(timer);
-
-        return c(timer);
+        return timer;
       },
-      setInterval: function (
-        [fn, ms]: [() => void, number],
-        c: (next: any) => void,
-      ) {
-        const timer = (setInterval as Timeout)(() => {
-          execState.callbackQueue.push(() =>
-            runMetaFunction(fn),
-          );
-        }, ms);
-
-        execState.programIntervals.add(timer);
-
-        return c(timer);
-      },
-    });
+    };
   };
 
   const step = (
@@ -345,7 +305,7 @@ export function meta({
           context.origin = getOrigin(node.left.name);
         }
 
-        displayEvaluation(
+        emitEvaluation(
           {
             e: node,
             // @ts-ignore
@@ -366,7 +326,11 @@ export function meta({
           // @ts-ignore
           node.type === 'AwaitExpression';
 
-        if (shouldWaitOnValuePhase) {
+        if (
+          shouldWaitOnValuePhase &&
+          // @ts-ignore
+          !config.external
+        ) {
           enqueue(() => {
             execState.next = undefined;
             c(r);
@@ -402,7 +366,7 @@ export function meta({
           handleAwait(
             err.value,
             (value) => {
-              displayEvaluation(
+              emitEvaluation(
                 awaitEvaluation,
                 currentFrame(),
                 {},
@@ -413,7 +377,7 @@ export function meta({
               });
             },
             (value) => {
-              displayEvaluation(
+              emitEvaluation(
                 awaitEvaluation,
                 currentFrame(),
                 {},
@@ -435,16 +399,23 @@ export function meta({
           isAwait ||
           isReturn
         ) {
-          displayEvaluation(
+          emitEvaluation(
             awaitEvaluation,
             currentFrame(),
             {},
           );
 
-          enqueue(() => {
-            execState.next = undefined;
+          if (
+            // @ts-ignore
+            config.external
+          ) {
             cerr(err);
-          });
+          } else {
+            enqueue(() => {
+              execState.next = undefined;
+              cerr(err);
+            });
+          }
         } else {
           cerr(err);
         }
@@ -474,7 +445,11 @@ export function meta({
       node.type === 'AwaitExpression' ||
       isApplyWithoutMetaFn;
 
-    if (shouldSkipWaitOnEnterPhase) {
+    if (
+      // @ts-ignore
+      config.external ||
+      shouldSkipWaitOnEnterPhase
+    ) {
       next();
     } else {
       enqueue(next);
@@ -545,6 +520,8 @@ export function meta({
   };
 
   const updateStackState = (evaluation: Evaluation) => {
+    // @ts-ignore
+    if (evaluation.config.external) return;
     // console.log(
     //   evaluation.e.type,
     //   evaluation,
@@ -621,7 +598,7 @@ export function meta({
           ...execState.callsRootImmutableRef,
         ];
 
-        displayEvaluation(
+        emitEvaluation(
           {
             ...evaluation,
             // @ts-ignore
@@ -634,7 +611,7 @@ export function meta({
         currentFrame().hasReturned = true;
         currentFrame().returnValue = evaluation.value;
 
-        displayEvaluation(
+        emitEvaluation(
           {
             ...evaluation,
             // @ts-ignore
@@ -689,7 +666,7 @@ export function meta({
     );
 
     if (isInteresting) {
-      displayEvaluation(evaluation, currentFrame(), {
+      emitEvaluation(evaluation, currentFrame(), {
         previousFrame: prevFrame(),
       });
       update();

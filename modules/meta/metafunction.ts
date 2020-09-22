@@ -165,14 +165,32 @@ export const evaluateMetaFunction = (
   );
 };
 
-export const createMetaFunctionWrapper = (
-  metaFunction: MetaesFunction,
+export const createMetaFunction = (
+  e: FunctionNode,
+  closure: Environment,
+  config: EvaluationConfig,
 ) => {
+  const metaFunctionExternal: MetaesFunction = {
+    e,
+    closure,
+    config: {
+      ...config,
+      // @ts-ignore
+      external: true,
+    },
+  };
+
+  const metaFunctionInternal: MetaesFunction = {
+    e,
+    closure,
+    config,
+  };
+
   const fn = function (this: unknown, ...args: unknown[]) {
     let result;
     let exception;
     evaluateMetaFunction(
-      metaFunction,
+      metaFunctionExternal,
       (r) => (result = r),
       (ex) => (exception = toException(ex)),
       this,
@@ -184,20 +202,9 @@ export const createMetaFunctionWrapper = (
     return result;
   };
 
-  markAsMetaFunction(fn, metaFunction);
+  markAsMetaFunction(fn, metaFunctionInternal);
   return fn;
 };
-
-export const createMetaFunction = (
-  e: FunctionNode,
-  closure: Environment,
-  config: EvaluationConfig,
-) =>
-  createMetaFunctionWrapper({
-    e,
-    closure,
-    config,
-  });
 
 export function Apply(
   { fn, thisValue, args }: NodeTypes.Apply,

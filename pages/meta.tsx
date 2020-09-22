@@ -13,7 +13,7 @@ import {
 } from 'helpers/formatValue';
 import { useEditorState } from 'modules/meta/useEditorState';
 
-import code from '!!raw-loader!samples/react';
+import code from '!!raw-loader!samples/oo';
 
 const Tree = dynamic(import('react-d3-tree'), {
   ssr: false,

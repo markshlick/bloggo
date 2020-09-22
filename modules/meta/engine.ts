@@ -9,19 +9,16 @@ import {
   ASTNode,
   Interpreter,
 } from 'metaes/types';
-import {
-  JavaScriptASTNode,
-  ExpressionStatement,
-} from 'metaes/nodeTypes';
+import { JavaScriptASTNode } from 'metaes/nodeTypes';
 import { ECMAScriptInterpreters } from 'metaes/interpreters';
-import { SetValue } from 'metaes/environment';
-import {
-  createMetaFunctionWrapper,
-  getMetaFunction,
-} from 'metaes/metafunction';
+import { getMetaFunction } from 'metaes/metafunction';
 import { evaluate } from 'metaes/evaluate';
-import { liftedAll } from 'metaes/callcc';
 import omit from 'lodash/omit';
+import {
+  ClassDeclaration,
+  ClassBody,
+  MethodDefinition,
+} from 'modules/meta/classIntepreters';
 import jsxInterpreters from 'modules/meta/jsxInterpreters';
 import { parseAndEvaluate } from 'modules/meta/evaluate';
 import {
@@ -141,6 +138,24 @@ export const interestingTypes: NodeNames[] = [
   'ExpressionStatement',
 ];
 
+const getInterpreters = () => {
+  return {
+    ...ECMAScriptInterpreters.values,
+    ...jsxInterpreters,
+    // async
+    Apply,
+    ArrowFunctionExpression,
+    FunctionExpression,
+    FunctionDeclaration,
+    AwaitExpression,
+    TryStatement,
+    // class
+    ClassDeclaration,
+    ClassBody,
+    MethodDefinition,
+  };
+};
+
 const globalObjects = {
   Number,
   Boolean,
@@ -226,7 +241,9 @@ export function meta({
   ) => {
     // @ts-ignore
     if (!evaluation.config.external) {
-      displayEvaluation(evaluation, frame, context);
+      try {
+        displayEvaluation(evaluation, frame, context);
+      } catch (error) {}
     }
   };
 
@@ -456,20 +473,6 @@ export function meta({
     }
   };
 
-  const getInterpreters = () => {
-    return {
-      ...ECMAScriptInterpreters.values,
-      ...jsxInterpreters,
-      SetValue: handleSetValue,
-      Apply,
-      ArrowFunctionExpression,
-      FunctionExpression,
-      FunctionDeclaration,
-      AwaitExpression,
-      TryStatement,
-    };
-  };
-
   const makeNodeHandlers = (names: NodeNames[]) => {
     const map: Partial<{ [name in NodeNames]: any }> = {};
 
@@ -569,7 +572,8 @@ export function meta({
 
     const fnName =
       evaluation.e?.e?.callee?.name ||
-      evaluation.e?.e?.id?.name;
+      evaluation.e?.e?.id?.name ||
+      evaluation.e?.e?.callee?.property.name;
 
     if (fnName && evaluation.e.type === 'Apply') {
       if (evaluation.phase === 'enter') {
@@ -671,28 +675,6 @@ export function meta({
       });
       update();
     }
-  };
-
-  const handleSetValue = (
-    e: {
-      name: string;
-      value: any;
-      isDeclaration: boolean;
-    },
-    c: Continuation,
-    cerr: ErrorContinuation,
-    env: Environment,
-  ) => {
-    const frame = currentFrame();
-    const k = `${frame?.fnName ?? ''}:${e.name}`;
-    execState.watchValues[k] =
-      execState.watchValues[k] ?? [];
-    execState.watchValues[k].push({
-      frame,
-      value: e.value,
-    });
-
-    SetValue(e, c, cerr, env);
   };
 
   const clearState = () => {

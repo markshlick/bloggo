@@ -10,7 +10,7 @@
         "NODE_OPTIONS": "--inspect"
       },
       "port": 9229,
-      "console": "internalConsole"
+      "console": "integratedTerminal"
     },
     {
       "type": "node",

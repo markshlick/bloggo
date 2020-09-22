@@ -18,6 +18,7 @@ import {
   ErrorSymbol,
 } from 'modules/meta/engine';
 import { formatValue } from 'helpers/formatValue';
+import { debug } from 'helpers/debug';
 
 export type Widget = {
   node: ASTNode;
@@ -331,12 +332,12 @@ export function useEditorState() {
     frame: StackFrame,
     context: EvaluationContext,
   ) => {
-    // console.log(
-    //   evaluation.e.type,
-    //   evaluation,
-    //   frame,
-    //   context,
-    // );
+    console.log(
+      evaluation.e.type,
+      evaluation,
+      frame,
+      context,
+    );
 
     if (evaluation.e.loc) {
       markEditor(evaluation);
@@ -468,7 +469,9 @@ export function useEditorState() {
           `(${evaluation.e.args.join(', ')})`,
         );
 
-        markEditor({ ...evaluation, e: metaFn.id });
+        if (metaFn.id) {
+          markEditor({ ...evaluation, e: metaFn.id });
+        }
       }
     }
   };

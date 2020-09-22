@@ -24,12 +24,13 @@ export function formatValue(arg: unknown): string {
           .map(formatValue)
           .join(', ')}]`;
   } else if (isObject(arg)) {
-    const keys = Object.keys(arg);
     return `${
       arg.constructor.name === 'Object'
         ? ''
-        : arg.constructor.name
-    } {${keys.join(', ')}}`;
+        : `#${arg.constructor.name}`
+    } { ${Array.from(Object.entries(arg))
+      .map(([k, v]) => `${k}: ${formatValue(v)}`)
+      .join(', ')} }`;
   } else if (isDate(arg)) {
     return `Date{${arg.toISOString()}}`;
   } else if (isString(arg)) {

@@ -4,11 +4,11 @@ import {
   IUnControlledCodeMirror,
 } from 'react-codemirror2';
 import { EditorConfiguration } from 'codemirror';
-import 'codemirror/mode/javascript/javascript';
+import 'codemirror/mode/jsx/jsx';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material-palenight.css';
 
-export default ({
+const CodeEditor = ({
   editorDidMount,
   value,
   options,
@@ -24,7 +24,9 @@ export default ({
     options={{
       ...options,
       theme: 'material-palenight',
-      mode: 'javascript',
+      mode: 'jsx',
     }}
   />
 );
+
+export default CodeEditor;

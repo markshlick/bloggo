@@ -7,7 +7,7 @@ import isArray from 'lodash/isArray';
 
 export function formatValue(arg: unknown): string {
   if (isFunction(arg)) {
-    return `fn()`;
+    return `<fn/class definition>`;
   } else if (isObject(arg) && isValidElement(arg)) {
     return `<${
       isString(arg.type) && arg.type.length

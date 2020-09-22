@@ -18,12 +18,12 @@ import {
   ErrorSymbol,
 } from 'modules/meta/engine';
 import { formatValue } from 'helpers/formatValue';
-import { debug } from 'helpers/debug';
 
 export type Widget = {
   node: ASTNode;
   attach: () => void;
   remove: () => void;
+  change: () => void;
 };
 
 export const filler = `This is just example text for now, but you can add custom content (like React components) to locations.  The content is dynamic and receives the current evaluation context.  Bam!`;
@@ -52,26 +52,35 @@ export function createWidget(
 ): Widget {
   const display = () => {
     const element = document.createElement('div');
-
-    const pos = cm.charCoords(p, 'local');
-    const top = pos.top;
-    const right = pos.right;
-
     element.style.position = 'absolute';
     element.setAttribute('cm-ignore-events', 'true');
-    element.style.top = top + 'px';
-    element.style.left = right + 'px';
+
+    const attach = () => {
+      render(el, element);
+      // @ts-ignore
+      cm.display.input.setUneditable(element);
+      // @ts-ignore
+      cm.display.sizer.appendChild(element);
+
+      change();
+    };
+
+    const remove = () => element.remove();
+
+    const change = () => {
+      const pos = cm.charCoords(p, 'local');
+      const top = pos.top;
+      const right = pos.right;
+
+      element.style.top = top + 'px';
+      element.style.left = right + 'px';
+    };
 
     return {
       node,
-      attach: () => {
-        render(el, element);
-        // @ts-ignore
-        cm.display.input.setUneditable(element);
-        // @ts-ignore
-        cm.display.sizer.appendChild(element);
-      },
-      remove: () => element.remove(),
+      attach,
+      remove,
+      change,
     };
   };
 
@@ -474,6 +483,10 @@ export function useEditorState() {
         }
       }
     }
+
+    editorItemsRef.current.editorWidgetsByFrame.forEach(
+      ({ widgets }) => widgets.forEach((w) => w.change()),
+    );
   };
 
   const clearPreviousCallsForFrameFn = (

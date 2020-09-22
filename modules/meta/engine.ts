@@ -18,6 +18,10 @@ import {
   ClassDeclaration,
   ClassBody,
   MethodDefinition,
+  GetProperty,
+  CallExpression,
+  SpreadElement,
+  Super,
 } from 'modules/meta/classIntepreters';
 import jsxInterpreters from 'modules/meta/jsxInterpreters';
 import { parseAndEvaluate } from 'modules/meta/evaluate';
@@ -153,6 +157,10 @@ const getInterpreters = () => {
     ClassDeclaration,
     ClassBody,
     MethodDefinition,
+    GetProperty,
+    CallExpression,
+    SpreadElement,
+    Super,
   };
 };
 

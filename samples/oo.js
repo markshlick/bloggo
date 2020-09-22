@@ -1,27 +1,33 @@
-function f() {
-  return 1;
-}
+function F() {}
 
-class A {
-  constructor(prop) {
-    this.prop = prop;
-    console.log('constructor');
+class O {}
+
+class S {
+  constructor(v) {
+    this.v = v;
   }
 
-  m() {
-    return 'm';
-  }
-}
-
-class B extends A {
-  n() {
-    return 'n';
+  x() {
+    return 'a' + this.v;
   }
 }
 
-f();
+class C extends S {
+  constructor(v) {
+    super(v);
+  }
 
-const a = new A(0);
-const b = new B(1);
-console.log(b.m());
-console.log(b.n());
+  x() {
+    return 'b' + this.v;
+  }
+
+  y() {
+    return super.x();
+  }
+}
+
+const s = new S(0);
+const c = new C(1);
+const sx = s.x();
+const cx = c.x();
+const cy = c.y();

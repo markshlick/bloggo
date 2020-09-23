@@ -8,17 +8,30 @@ async function a() {
 
 async function b() {
   console.log('before b() await');
-  const r = await Promise.resolve('P');
+  const r = await Promise.resolve('hi!');
   console.log('after b() await');
   return r;
 }
 
-async function c() {
-  return await Promise.resolve(1);
+async function c(v) {
+  return await Promise.resolve(v);
 }
 
-c();
+function d(v) {
+  console.log('d', v);
+  // return v + 1;
+  throw v;
+}
+
+function e(v) {
+  console.log('e', v);
+
+  return v + '!';
+}
 
 console.log('before a()');
-console.log('a return', a());
+const r = a();
+console.log('a return', r);
 console.log('after a()');
+
+r.then(c).then(d).catch(e).then(e);

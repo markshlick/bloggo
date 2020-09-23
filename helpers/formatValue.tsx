@@ -7,7 +7,7 @@ import isArray from 'lodash/isArray';
 
 export function formatValue(arg: unknown): string {
   if (isFunction(arg)) {
-    return `<fn/class definition>`;
+    return `<fn>`;
   } else if (isObject(arg) && isValidElement(arg)) {
     return `<${
       isString(arg.type) && arg.type.length
@@ -24,13 +24,14 @@ export function formatValue(arg: unknown): string {
           .map(formatValue)
           .join(', ')}]`;
   } else if (isObject(arg)) {
+    const entries = Array.from(Object.entries(arg))
+      .map(([k, v]) => `${k}: ${formatValue(v)}`)
+      .join(', ');
     return `${
       arg.constructor.name === 'Object'
         ? ''
         : `#${arg.constructor.name}`
-    } { ${Array.from(Object.entries(arg))
-      .map(([k, v]) => `${k}: ${formatValue(v)}`)
-      .join(', ')} }`;
+    } ${entries ? `{${entries}}` : '{}'}`;
   } else if (isDate(arg)) {
     return `Date{${arg.toISOString()}}`;
   } else if (isString(arg)) {

@@ -20,31 +20,98 @@ import {
 import * as NodeTypes from 'metaes/nodeTypes';
 import { ErrorSymbol } from './engine';
 
+const wrapHandler = (
+  handler: Function,
+  done: Function,
+  fail: Function,
+) => (value: unknown) => {
+  if (!handler) {
+    return done(value);
+  }
+
+  const mfn = getMetaFunction(handler);
+  if (mfn) {
+    const { config } = mfn;
+    config.asyncRuntime?.enqueueCallback(
+      handler,
+      [value],
+      done,
+      fail,
+    );
+
+    return;
+  }
+
+  // TODO: handle external?
+  try {
+    const r = handler(value);
+    if (r && r.then) {
+      r.then(done, fail);
+    } else {
+      done(r);
+    }
+  } catch (error) {
+    fail(error);
+  }
+};
+
 function deferred() {
   let resolve: (v: unknown) => void,
     reject: (v: unknown) => void;
+
   const promise = new Promise((resolve_, reject_) => {
     resolve = resolve_;
     reject = reject_;
   });
 
-  const d = {
+  const _then = promise.then.bind(promise);
+  const _catch = promise.catch.bind(promise);
+
+  (promise as any).then = (
+    onfulfilled: any,
+    onrejected: any,
+  ) => {
+    const dfd = deferred();
+
+    _then(
+      wrapHandler(onfulfilled, dfd.resolve, dfd.reject),
+      wrapHandler(onrejected, dfd.resolve, dfd.reject),
+    );
+
+    return dfd.promise;
+  };
+
+  promise.catch = (onRejected: any) => {
+    const dfd = deferred();
+
+    _catch(
+      wrapHandler(onRejected, dfd.resolve, dfd.reject),
+    );
+
+    return dfd.promise;
+  };
+
+  // const _catch = promise.catch;
+  // promise.catch = (rs, rj) => {};
+
+  const deferredObj = {
+    done: false,
     value: undefined as unknown,
     error: undefined as unknown,
     promise,
     resolve: (v: unknown) => {
-      d.value = v;
+      deferredObj.value = v;
       resolve(v);
       return promise;
     },
     reject: (v: unknown) => {
-      d.error = v;
+      deferredObj.error = v;
       reject(v);
       return promise;
     },
   };
 
-  return d;
+  return deferredObj;
 }
 
 // TODO: move to interpreter style
@@ -122,7 +189,7 @@ export const evaluateMetaFunction = (
                 [ErrorSymbol]: true,
               });
             } else {
-              returnDeferred;
+              c(value);
             }
           } else {
             // ignore what was evaluated in function body, return statement in error continuation should carry the value

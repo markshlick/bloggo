@@ -174,6 +174,9 @@ export default function Meta() {
   const {
     callsRootImmutableRef,
     callStack,
+    callbackQueue,
+    inFlightPromises,
+    // nextAsync,
     // watchValues,
   } = metaRef.current.execState;
 
@@ -265,6 +268,42 @@ export default function Meta() {
           );
         }}
       />
+    </div>
+  );
+
+  const callbackQueueEl = (
+    <div key="stack">
+      <h2>The Event Loop</h2>
+      <div
+        style={{
+          height: '80px',
+          overflow: 'scroll',
+          border: '1px lightgray solid',
+          borderRadius: 4,
+          padding: 12,
+          display: 'flex',
+        }}
+      >
+        {[
+          // ...(nextAsync ? [nextAsync.name] : []),
+          ...callbackQueue.map(({ name }) => name),
+          ...Array.from(inFlightPromises).map(
+            ({ name }) => name,
+          ),
+        ].map((name, i) => (
+          <div
+            key={i}
+            style={{
+              height: 56,
+              // width: 56,
+              border: '1px lightgray solid',
+              marginRight: 12,
+            }}
+          >
+            {name}
+          </div>
+        ))}
+      </div>
     </div>
   );
 
@@ -391,6 +430,7 @@ export default function Meta() {
         {buttonsEl}
         {playbackEl}
       </div>
+      <div>{callbackQueueEl}</div>
       <div
         key="data"
         className="space"
@@ -401,7 +441,7 @@ export default function Meta() {
         }}
       >
         {callStackEl}
-        {callGraphEl}
+        {/* {callGraphEl} */}
       </div>
     </div>
   );

@@ -17,7 +17,10 @@ import {
   EvaluationContext,
   ErrorSymbol,
 } from 'modules/meta/engine';
-import { formatValue } from 'helpers/formatValue';
+import {
+  formatArgs,
+  formatValue,
+} from 'helpers/formatValue';
 
 export type Widget = {
   node: ASTNode;
@@ -355,17 +358,14 @@ export function useEditorState() {
     frame: StackFrame,
     context: EvaluationContext,
   ) => {
-    console.log(
-      evaluation.e.type,
-      evaluation,
-      frame,
-      context,
-    );
+    // console.log(
+    //   evaluation.e.type,
+    //   evaluation,
+    //   frame,
+    //   context,
+    // );
 
-    if (
-      evaluation.phase !== 'exit' &&
-      evaluation.e.type !== 'ExpressionStatement'
-    ) {
+    if (evaluation.phase !== 'exit') {
       if (evaluation.e.loc) {
         markEditor(evaluation);
       }
@@ -488,7 +488,7 @@ export function useEditorState() {
         displayInlineValue(
           metaFn,
           frame,
-          `(${evaluation.e.args.join(', ')})`,
+          `(${formatArgs(evaluation.e.args)})`,
         );
 
         if (metaFn.id) {

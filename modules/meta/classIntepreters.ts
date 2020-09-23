@@ -24,7 +24,6 @@ export function ClassDeclaration(
   config: EvaluationConfig,
 ) {
   const name = e.id?.name ?? '';
-  console.log(name);
 
   function onSuperClass(superClass: any) {
     evaluate(
@@ -276,8 +275,6 @@ export function CallExpression(
           evaluate(
             e.callee,
             (callee) => {
-              console.log(callee);
-
               if (typeof callee === 'function') {
                 try {
                   if (callee === callcc) {

@@ -64,12 +64,20 @@ type ExecState = {
   next?: () => any;
   programTimers: Set<number>;
   programIntervals: Set<number>;
-  inFlightPromises: Set<Promise<unknown>>;
+  inFlightPromises: Set<{
+    promise: Promise<unknown>;
+    name: string;
+    type: string;
+  }>;
   allStackNodes: StackFrame[];
   watchValues: WatchValues;
   callsRootImmutableRef: StackFrame[];
   programEnvKeys: string[];
-  callbackQueue: (() => any)[];
+  callbackQueue: {
+    name: string;
+    type: string;
+    fn: () => any;
+  }[];
 };
 
 export type BlockFrame = {
@@ -139,7 +147,7 @@ export const interestingTypes: NodeNames[] = [
   'WhileStatement',
   'AwaitExpression',
   'Apply',
-  'ExpressionStatement',
+  // 'ExpressionStatement',
 ];
 
 const getInterpreters = () => {
@@ -269,19 +277,51 @@ export function meta({
     }
   };
 
+  const enqueueCallback = (
+    fn: Function,
+    args: any[],
+    done: Function,
+    fail: Function,
+  ) => {
+    execState.callbackQueue.push({
+      name: 'Promise.then()',
+      type: 'PromiseThen',
+      fn: () => runMetaFunction(fn, args, done, fail),
+    });
+
+    handleEvaluationEnd();
+  };
+
+  const runMetaFunction = (
+    fn: Function,
+    args: any = [],
+    done?: Function,
+    fail?: Function,
+  ) => {
+    const { e, closure, config } = getMetaFunction(fn);
+
+    evaluate(
+      { e, fn, type: 'Apply', args },
+      (value) => {
+        if (done) {
+          done(value);
+        }
+        handleEvaluationEnd();
+      },
+      (ex) => {
+        if (fail) {
+          fail(ex.value);
+        } else {
+          exceptionHandler(ex);
+        }
+        handleEvaluationEnd();
+      },
+      closure,
+      config,
+    );
+  };
+
   const makeHooks = () => {
-    const runMetaFunction = (fn: Function) => {
-      const { e, closure, config } = getMetaFunction(fn);
-
-      evaluate(
-        { e, fn, type: 'Apply', args: [] },
-        handleEvaluationEnd,
-        exceptionHandler,
-        closure,
-        config,
-      );
-    };
-
     return {
       clearTimeout: (timer: number, c: () => void) => {
         execState.programTimers.delete(timer);
@@ -292,8 +332,12 @@ export function meta({
         const timer = (setTimeout as Timeout)(() => {
           execState.programTimers.delete(timer);
 
-          execState.callbackQueue.push(() => {
-            runMetaFunction(fn);
+          execState.callbackQueue.push({
+            name: 'setTimeout()',
+            type: 'Timeout',
+            fn: () => {
+              runMetaFunction(fn, []);
+            },
           });
 
           handleEvaluationEnd();
@@ -389,6 +433,7 @@ export function meta({
 
         if (isAwait) {
           handleAwait(
+            node,
             err.value,
             (value) => {
               emitEvaluation(
@@ -472,7 +517,7 @@ export function meta({
       node.type === 'VariableDeclarator' ||
       node.type === 'ReturnStatement' ||
       node.type === 'AssignmentExpression' ||
-      node.type === 'ExpressionStatement' ||
+      // node.type === 'ExpressionStatement' ||
       // @ts-ignore
       node.type === 'AwaitExpression' ||
       isApplyWithoutMetaFn;
@@ -503,8 +548,8 @@ export function meta({
 
     if (execState.autoStepping) {
       const run = () => {
-        if (execState.autoStepping) {
-          next();
+        if (execState.autoStepping && execState.next) {
+          execState.next();
         } else {
           update();
         }
@@ -734,6 +779,8 @@ export function meta({
       exceptionHandler,
       programEnv,
       {
+        handleEvaluationEnd,
+        asyncRuntime: { enqueueCallback },
         interceptor: updateStackState,
         interpreters: {
           prev: {
@@ -748,27 +795,44 @@ export function meta({
   };
 
   const handleAwait = (
+    node: ASTNode,
     promise: Promise<unknown>,
     c: Continuation,
     cerr: ErrorContinuation,
   ) => {
     const stack = [...execState.callStack];
+    const p = {
+      name: `suspend ${currentFrame().fnName}()`,
+      type: 'AwaitSuspend',
+      promise,
+    };
+
     // execState.awaitCount++;
-    execState.inFlightPromises.add(promise);
+    execState.inFlightPromises.add(p);
     promise.then(
       (value: unknown) => {
         // execState.awaitCount--;
-        execState.inFlightPromises.delete(promise);
-        execState.callbackQueue.push(() => {
-          execState.callStack = stack;
-          c(value);
+        execState.inFlightPromises.delete(p);
+        execState.callbackQueue.push({
+          name: `resume ${currentFrame().fnName}() `,
+          type: 'AsyncFunction',
+          fn: () => {
+            execState.callStack = stack;
+
+            c(value);
+          },
         });
       },
       (error) => {
-        execState.inFlightPromises.delete(promise);
-        execState.callbackQueue.push(() => {
-          execState.callStack = stack;
-          cerr(error);
+        execState.inFlightPromises.delete(p);
+        execState.callbackQueue.push({
+          name: `resume ${currentFrame().fnName}()`,
+
+          type: 'AsyncFunction',
+          fn: () => {
+            execState.callStack = stack;
+            cerr(error);
+          },
         });
       },
     );
@@ -776,17 +840,31 @@ export function meta({
 
   const handleEvaluationEnd = () => {
     if (execState.next) {
+      execState.next();
+      update();
       return;
     }
 
-    const nextFn = execState.callbackQueue.shift();
-    if (nextFn !== undefined) {
-      execState.next = nextFn;
-      if (execState.autoStepping) {
-        nextFn();
-      } else {
-        update();
-      }
+    const nextCb = execState.callbackQueue.shift();
+
+    if (nextCb !== undefined) {
+      nextCb.fn();
+      update();
+
+      // // if i want to pause on async poll
+
+      // execState.nextAsync = nextCb;
+
+      // const next = () => {
+      //   execState.nextAsync = undefined;
+      //   nextCb.fn();
+      // };
+      // execState.next = next;
+      // if (execState.autoStepping) {
+      //   next();
+      // } else {
+      //   update();
+      // }
       return;
     }
 

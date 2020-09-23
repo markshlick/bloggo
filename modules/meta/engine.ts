@@ -818,7 +818,6 @@ export function meta({
           type: 'AsyncFunction',
           fn: () => {
             execState.callStack = stack;
-
             c(value);
           },
         });

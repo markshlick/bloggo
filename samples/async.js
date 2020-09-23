@@ -19,7 +19,6 @@ async function c(v) {
 
 function d(v) {
   console.log('d', v);
-  // return v + 1;
   throw v;
 }
 
@@ -35,3 +34,15 @@ console.log('a return', r);
 console.log('after a()');
 
 r.then(c).then(d).catch(e).then(e);
+
+function x() {
+  function y(v) {
+    console.log(
+      'stack should be x -> y (this is broken right now)',
+    );
+    console.log(v);
+  }
+  c(1).then(y);
+}
+
+x();

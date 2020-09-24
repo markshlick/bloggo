@@ -159,6 +159,7 @@ export default function Meta() {
     clearEditor,
     clearCurrentMarker,
     onEvaluation,
+    onPending,
     configEditor,
   } = useEditorState();
 
@@ -167,6 +168,7 @@ export default function Meta() {
       speed: defaultSpeed,
       onEvaluation,
       handleError,
+      onPending,
       update,
     }),
   );
@@ -176,8 +178,6 @@ export default function Meta() {
     callStack,
     callbackQueue,
     inFlightPromises,
-    // nextAsync,
-    // watchValues,
   } = metaRef.current.execState;
 
   // view helpers
@@ -370,7 +370,9 @@ export default function Meta() {
                         <small>
                           <strong>{'<='} </strong>
                           <em>
-                            {formatValue(returnValue)}
+                            {formatValue(
+                              returnValue?.value,
+                            )}
                           </em>
                         </small>
                       </div>

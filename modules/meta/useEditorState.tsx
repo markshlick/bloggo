@@ -376,9 +376,7 @@ export function useEditorState() {
       evaluation.e.type === 'Program' &&
       evaluation.phase === 'exit'
     ) {
-      editorItemsRef.current.commentLineWidget?.clear();
-      editorItemsRef.current.reactLineWidget?.clear();
-      editorItemsRef.current.marker?.clear();
+      clearCurrentMarker();
     } else if (
       evaluation.e.type === 'AssignmentExpression' &&
       // @ts-ignore
@@ -528,7 +526,6 @@ export function useEditorState() {
 
   const clearEditor = () => {
     clearCurrentMarker();
-    editorItemsRef.current.commentLineWidget?.clear();
 
     editorItemsRef.current.editorWidgetsByFrame.forEach(
       (l) => l.widgets.forEach((n) => n.remove()),
@@ -540,11 +537,16 @@ export function useEditorState() {
   const getCode = () =>
     editorRef.current?.getDoc().getValue();
 
+  const onPending = () => {
+    clearCurrentMarker();
+  };
+
   return {
     getCode,
     clearEditor,
     clearCurrentMarker,
     onEvaluation,
+    onPending,
     configEditor,
   };
 }

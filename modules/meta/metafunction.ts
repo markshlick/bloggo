@@ -20,39 +20,67 @@ import {
 import * as NodeTypes from 'metaes/nodeTypes';
 import { ErrorSymbol } from './engine';
 
+type AsyncRuntime = {
+  enqueueCallback: (...args: any[]) => void;
+  registerPromise: (...args: any[]) => void;
+};
+
 const wrapHandler = (
   handler: Function,
   done: Function,
   fail: Function,
-) => (value: unknown) => {
-  if (!handler) {
-    return done(value);
-  }
-
-  const mfn = getMetaFunction(handler);
-  if (mfn) {
-    const { config } = mfn;
-    config.asyncRuntime?.enqueueCallback(
-      handler,
-      [value],
-      done,
-      fail,
-    );
-
-    return;
-  }
-
-  // TODO: handle external?
-  try {
-    const r = handler(value);
-    if (r && r.then) {
-      r.then(done, fail);
-    } else {
-      done(r);
+  promiseHandle: any,
+) => {
+  return (value: unknown) => {
+    if (!handler) {
+      return done(value);
     }
-  } catch (error) {
-    fail(error);
+
+    const mfn = getMetaFunction(handler);
+
+    if (mfn) {
+      mfn.config.asyncRuntime.enqueueCallback(
+        handler,
+        [value],
+        done,
+        fail,
+        promiseHandle,
+      );
+
+      return;
+    }
+
+    // TODO: handle external?
+    try {
+      const r = handler(value);
+      if (r && r.then) {
+        r.then(done, fail);
+      } else {
+        done(r);
+      }
+    } catch (error) {
+      fail(error);
+    }
+  };
+};
+
+const toPromiseHandle = (m, n, dfd) => {
+  let promiseHandle;
+  const mfn1 = n ? getMetaFunction(n as Function) : null;
+  const mfn2 = m ? getMetaFunction(m as Function) : null;
+  let mfn = mfn1 ?? mfn2;
+
+  if (mfn) {
+    promiseHandle = {
+      name: `then(${mfn.e?.id?.name ?? `<fn>`}()`,
+      type: 'Promise.then',
+      promise: dfd.promise,
+    };
+
+    mfn.config.asyncRuntime.registerPromise(promiseHandle);
   }
+
+  return promiseHandle;
 };
 
 function deferred() {
@@ -72,10 +100,25 @@ function deferred() {
     onrejected: any,
   ) => {
     const dfd = deferred();
+    const promiseHandle = toPromiseHandle(
+      onfulfilled,
+      onrejected,
+      dfd,
+    );
 
     _then(
-      wrapHandler(onfulfilled, dfd.resolve, dfd.reject),
-      wrapHandler(onrejected, dfd.resolve, dfd.reject),
+      wrapHandler(
+        onfulfilled,
+        dfd.resolve,
+        dfd.reject,
+        promiseHandle,
+      ),
+      wrapHandler(
+        onrejected,
+        dfd.resolve,
+        dfd.reject,
+        promiseHandle,
+      ),
     );
 
     return dfd.promise;
@@ -85,14 +128,16 @@ function deferred() {
     const dfd = deferred();
 
     _catch(
-      wrapHandler(onRejected, dfd.resolve, dfd.reject),
+      wrapHandler(
+        onRejected,
+        dfd.resolve,
+        dfd.reject,
+        toPromiseHandle(onRejected, undefined, dfd),
+      ),
     );
 
     return dfd.promise;
   };
-
-  // const _catch = promise.catch;
-  // promise.catch = (rs, rj) => {};
 
   const deferredObj = {
     done: false,
@@ -217,7 +262,9 @@ export const evaluateMetaFunction = (
               c(exception.value);
             }
           } else if (exception.type === 'AwaitExpression') {
+            // @ts-ignore
             returnDeferred = deferred();
+
             c(returnDeferred.promise);
           } else {
             cerr(exception);

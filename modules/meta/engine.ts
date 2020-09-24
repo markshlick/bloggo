@@ -1,5 +1,4 @@
-import React, { createElement } from 'react';
-import { noop } from 'metaes';
+import React from 'react';
 import {
   Continuation,
   ErrorContinuation,
@@ -33,6 +32,7 @@ import {
   AwaitExpression,
   TryStatement,
 } from 'modules/meta/metafunction';
+import { values } from 'lodash';
 
 type Timeout = (fn: () => void, ms: number) => number;
 
@@ -130,6 +130,7 @@ export type Engine = {
     frame: StackFrame,
     context: EvaluationContext,
   ) => void;
+  onPending: () => void;
   update: () => void;
 };
 
@@ -228,6 +229,7 @@ export function meta({
   speed,
   handleError,
   onEvaluation,
+  onPending,
   update,
 }: Engine) {
   // helpers
@@ -277,15 +279,20 @@ export function meta({
     }
   };
 
+  const registerPromise = (p: any) =>
+    execState.inFlightPromises.add(p);
+
   const enqueueCallback = (
     fn: Function,
     args: any[],
     done: Function,
     fail: Function,
+    p: any,
   ) => {
+    p && execState.inFlightPromises.delete(p);
     execState.callbackQueue.push({
-      name: 'Promise.then()',
-      type: 'PromiseThen',
+      name: p?.name ?? '<fn>',
+      type: p?.type ?? '',
       fn: () => runMetaFunction(fn, args, done, fail),
     });
 
@@ -300,6 +307,7 @@ export function meta({
   ) => {
     const { e, closure, config } = getMetaFunction(fn);
 
+    execState.callStack = [...closure.stack];
     evaluate(
       { e, fn, type: 'Apply', args },
       (value) => {
@@ -367,6 +375,7 @@ export function meta({
         const context: EvaluationContext = {
           previousFrame: prevFrame(),
         };
+
         if (
           node.type === 'AssignmentExpression' &&
           node.left.type === 'Identifier'
@@ -387,16 +396,8 @@ export function meta({
           context,
         );
 
-        const shouldWaitOnValuePhase =
-          node.type === 'Program' ||
-          node.type === 'VariableDeclarator' ||
-          node.type === 'AssignmentExpression' ||
-          // FIXME - override node types
-          // @ts-ignore
-          node.type === 'AwaitExpression';
-
         if (
-          shouldWaitOnValuePhase &&
+          shouldWaitOnValuePhase(node) &&
           // @ts-ignore
           !config.external
         ) {
@@ -422,16 +423,16 @@ export function meta({
           // @ts-ignore
           err.type === 'ReturnStatement';
 
-        const awaitEvaluation: Evaluation = {
-          e: node,
-          // @ts-ignore
-          phase: 'resume',
-          value: err,
-          config,
-          env,
-        };
-
         if (isAwait) {
+          const awaitEvaluation: Evaluation = {
+            e: node,
+            // @ts-ignore
+            phase: 'resume',
+            value: err,
+            config,
+            env,
+          };
+
           handleAwait(
             node,
             err.value,
@@ -443,6 +444,7 @@ export function meta({
               );
               enqueue(() => {
                 execState.next = undefined;
+                execState.callStack = env.stack;
                 c(value);
               });
             },
@@ -454,6 +456,7 @@ export function meta({
               );
               enqueue(() => {
                 execState.next = undefined;
+                execState.callStack = env.stack;
                 cerr({
                   type: 'ThrowStatement',
                   value: value,
@@ -507,11 +510,31 @@ export function meta({
       );
     };
 
+    if (
+      // @ts-ignore
+      config.external ||
+      shouldSkipWaitOnEnterPhase(node)
+    ) {
+      next();
+    } else {
+      enqueue(next);
+    }
+  };
+
+  const shouldWaitOnValuePhase = (node: ASTNode) =>
+    node.type === 'Program' ||
+    node.type === 'VariableDeclarator' ||
+    node.type === 'AssignmentExpression' ||
+    // FIXME - override node types
+    // @ts-ignore
+    node.type === 'AwaitExpression';
+
+  const shouldSkipWaitOnEnterPhase = (node: ASTNode) => {
     const isApplyWithoutMetaFn =
       node.type === 'Apply' && !getMetaFunction(node.fn)?.e;
 
     // TODO: expose this as a callback?
-    const shouldSkipWaitOnEnterPhase =
+    const skip =
       // HACK: Program statements (not interesting) are handled as BlockStatements by the interpreter
       node.type === 'Program' ||
       node.type === 'VariableDeclarator' ||
@@ -522,15 +545,7 @@ export function meta({
       node.type === 'AwaitExpression' ||
       isApplyWithoutMetaFn;
 
-    if (
-      // @ts-ignore
-      config.external ||
-      shouldSkipWaitOnEnterPhase
-    ) {
-      next();
-    } else {
-      enqueue(next);
-    }
+    return skip;
   };
 
   const makeNodeHandlers = (names: NodeNames[]) => {
@@ -587,12 +602,18 @@ export function meta({
   const updateStackState = (evaluation: Evaluation) => {
     // @ts-ignore
     if (evaluation.config.external) return;
-    // console.log(
-    //   evaluation.e.type,
-    //   evaluation,
-    //   currentFrame(),
-    //   currentBlock(),
-    // );
+
+    const frame = currentFrame();
+    // @ts-ignore
+    if (!evaluation.env.stack) {
+      // @ts-ignore
+      evaluation.env.stack = [...execState.callStack];
+    }
+    // @ts-ignore
+    if (!evaluation.env.blockStack) {
+      // @ts-ignore
+      evaluation.env.blockStack ??= [...frame.blockStack];
+    }
 
     const evaluationType = evaluation.e.type;
     if (blockScopeTypes.includes(evaluationType)) {
@@ -635,9 +656,10 @@ export function meta({
     const fnName =
       evaluation.e?.e?.callee?.name ||
       evaluation.e?.e?.id?.name ||
-      evaluation.e?.e?.callee?.property.name;
+      evaluation.e?.e?.callee?.property.name ||
+      `<anonymous fn()>`;
 
-    if (fnName && evaluation.e.type === 'Apply') {
+    if (evaluation.e.type === 'Apply') {
       if (evaluation.phase === 'enter') {
         const metaFn = getMetaFunction(evaluation.e.fn)?.e;
 
@@ -703,13 +725,18 @@ export function meta({
 
         frame.values = { ...frame.values, ...values };
       } else {
-        // let env = evaluation.env;
+        let values = {};
+        let env = evaluation.env;
         // // HACK
         // // @ts-ignore
-        // while (env && env !== frame.env) {
-        //   frame.values = { ...frame.values, ...env.values };
-        //   env = env.prev;
-        // }
+        while (
+          env &&
+          env.stack[env.stack.length - 1] === frame
+        ) {
+          values = { ...values, ...env.values };
+          env = env.prev;
+        }
+        frame.values = values;
       }
     }
 
@@ -780,7 +807,10 @@ export function meta({
       programEnv,
       {
         handleEvaluationEnd,
-        asyncRuntime: { enqueueCallback },
+        asyncRuntime: {
+          enqueueCallback,
+          registerPromise,
+        },
         interceptor: updateStackState,
         interpreters: {
           prev: {
@@ -800,15 +830,12 @@ export function meta({
     c: Continuation,
     cerr: ErrorContinuation,
   ) => {
-    const stack = [...execState.callStack];
     const p = {
       name: `suspend ${currentFrame().fnName}()`,
       type: 'AwaitSuspend',
       promise,
     };
 
-    // execState.awaitCount++;
-    execState.inFlightPromises.add(p);
     promise.then(
       (value: unknown) => {
         // execState.awaitCount--;
@@ -817,10 +844,11 @@ export function meta({
           name: `resume ${currentFrame().fnName}() `,
           type: 'AsyncFunction',
           fn: () => {
-            execState.callStack = stack;
+            // execState.callStack = stack;
             c(value);
           },
         });
+        if (!execState.next) handleEvaluationEnd();
       },
       (error) => {
         execState.inFlightPromises.delete(p);
@@ -829,18 +857,17 @@ export function meta({
 
           type: 'AsyncFunction',
           fn: () => {
-            execState.callStack = stack;
+            // execState.callStack = stack;
             cerr(error);
           },
         });
+        if (!execState.next) handleEvaluationEnd();
       },
     );
   };
 
   const handleEvaluationEnd = () => {
     if (execState.next) {
-      execState.next();
-      update();
       return;
     }
 
@@ -849,37 +876,10 @@ export function meta({
     if (nextCb !== undefined) {
       nextCb.fn();
       update();
-
-      // // if i want to pause on async poll
-
-      // execState.nextAsync = nextCb;
-
-      // const next = () => {
-      //   execState.nextAsync = undefined;
-      //   nextCb.fn();
-      // };
-      // execState.next = next;
-      // if (execState.autoStepping) {
-      //   next();
-      // } else {
-      //   update();
-      // }
       return;
     }
 
-    if (execState.inFlightPromises.size) {
-      Promise.race(
-        Array.from(execState.inFlightPromises.values()),
-      ).then(handleEvaluationEnd);
-    }
-
-    // if (
-    //   !execState.programTimers.size &&
-    //   !execState.programIntervals.size &&
-    //   !execState.callbackQueue.length &&
-    //   !execState.next
-    // ) {
-    // }
+    onPending();
   };
 
   const endExec = () => {

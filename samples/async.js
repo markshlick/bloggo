@@ -13,6 +13,11 @@ async function b() {
   return r;
 }
 
+console.log('before a()');
+const r = a();
+console.log('a return', r);
+console.log('after a()');
+
 async function c(v) {
   return await Promise.resolve(v);
 }
@@ -28,21 +33,26 @@ function e(v) {
   return v + '!';
 }
 
-console.log('before a()');
-const r = a();
-console.log('a return', r);
-console.log('after a()');
-
 r.then(c).then(d).catch(e).then(e);
 
+async function z(v) {
+  return await Promise.resolve(v);
+}
 function x() {
+  let a = 1;
   function y(v) {
-    console.log(
-      'stack should be x -> y (this is broken right now)',
-    );
-    console.log(v);
+    console.log({ v, a });
   }
-  c(1).then(y);
+  z(a).then(y);
+  a = 2;
 }
 
 x();
+
+async function z(v) {
+  return await Promise.resolve(v);
+}
+
+const s = z();
+s.then(() => console.log(1));
+s.then(() => console.log(2));

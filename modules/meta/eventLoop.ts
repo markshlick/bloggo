@@ -1,14 +1,15 @@
 // @ts-nocheck
 // ^ sorry, future self
 
+import pull from 'lodash/pull';
+import remove from 'lodash/remove';
+
 import {
   Continuation,
   ErrorContinuation,
   ASTNode,
 } from 'metaes/types';
-import { StackFrame, Timeout } from './types';
-import pull from 'lodash/pull';
-import remove from 'lodash/remove';
+import { StackFrame, Timeout } from 'modules/meta/types';
 
 export function eventLoop({
   handleEvaluationEnd,

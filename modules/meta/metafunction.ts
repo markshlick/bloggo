@@ -291,7 +291,7 @@ export const evaluateMetaFunction = (
   );
 };
 
-export const createMetaFunction = (
+export const createMetaFunctionWrapper = (
   e: FunctionNode,
   closure: Environment,
   config: EvaluationConfig,
@@ -332,145 +332,19 @@ export const createMetaFunction = (
   return fn;
 };
 
-export function Apply(
-  { fn, thisValue, args }: NodeTypes.Apply,
-  c: Continuation,
-  cerr: ErrorContinuation,
-  _env: Environment,
-  config: EvaluationConfig,
-) {
-  try {
-    if (isMetaFunction(fn)) {
-      evaluateMetaFunction(
-        getMetaFunction(fn),
-        c,
-        cerr,
-        thisValue,
-        args,
-        config,
-      );
-    } else {
-      c(fn.apply(thisValue, args));
-    }
-  } catch (e) {
-    cerr(e);
-  }
-}
-
-function _createMetaFunction(
+export function createMetaFunction(
   e:
     | NodeTypes.ArrowFunctionExpression
-    | NodeTypes.FunctionExpression,
+    | NodeTypes.FunctionExpression
+    | NodeTypes.FunctionDeclaration,
   c: Continuation,
   cerr: ErrorContinuation,
   env: Environment,
   config: EvaluationConfig,
 ) {
   try {
-    c(createMetaFunction(e, env, config));
+    c(createMetaFunctionWrapper(e, env, config));
   } catch (error) {
     cerr(LocatedError(error, e));
   }
 }
-
-export function ArrowFunctionExpression(
-  e: NodeTypes.ArrowFunctionExpression,
-  c: Continuation,
-  cerr: ErrorContinuation,
-  env: Environment,
-  config: EvaluationConfig,
-) {
-  _createMetaFunction(e, c, cerr, env, config);
-}
-
-export function FunctionExpression(
-  e: NodeTypes.FunctionExpression,
-  c: Continuation,
-  cerr: ErrorContinuation,
-  env: Environment,
-  config: EvaluationConfig,
-) {
-  _createMetaFunction(e, c, cerr, env, config);
-}
-
-export function FunctionDeclaration(
-  e: NodeTypes.FunctionDeclaration,
-  c: Continuation,
-  cerr: ErrorContinuation,
-  env: Environment,
-  config: EvaluationConfig,
-) {
-  try {
-    c(createMetaFunction(e, env, config));
-  } catch (error) {
-    cerr(LocatedError(error, e));
-  }
-}
-
-const EXCEPTION_NAME = '/exception';
-
-export function TryStatement(
-  e: NodeTypes.TryStatement,
-  c: Continuation,
-  cerr: ErrorContinuation,
-  env: Environment,
-  config: EvaluationConfig,
-) {
-  evaluate(
-    e.block,
-    c,
-    (exception) => {
-      if (exception.type === 'AwaitExpression') {
-        cerr(exception);
-        return;
-      }
-
-      return evaluate(
-        e.handler,
-        () =>
-          e.finalizer
-            ? evaluate(e.finalizer, c, cerr, env, config)
-            : // @ts-ignore
-              c(),
-        cerr,
-        {
-          values: {
-            [EXCEPTION_NAME]: exception.value || exception,
-          },
-          prev: env,
-        },
-        config,
-      );
-    },
-    env,
-    config,
-  );
-}
-
-export const AwaitExpression = (
-  e: {
-    argument: NodeTypes.ExpressionStatement;
-  },
-  c: Continuation,
-  cerr: ErrorContinuation,
-  env: Environment,
-  config: EvaluationConfig,
-) => {
-  evaluate(
-    e.argument,
-    (value) => {
-      if (value instanceof Promise) {
-        cerr({
-          type: 'AwaitExpression',
-          value: value,
-          [ErrorSymbol]: true,
-        });
-      } else {
-        c(value);
-      }
-    },
-    cerr,
-    env,
-    config,
-  );
-};

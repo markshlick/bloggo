@@ -1,11 +1,4 @@
-import { debug } from 'console';
-import { noop } from 'metaes';
 import { evaluate, visitArray } from 'metaes/evaluate';
-import { ECMAScriptInterpreters } from 'metaes/interpreters';
-import {
-  createMetaFunctionWrapper,
-  getMetaFunction,
-} from 'metaes/metafunction';
 import {
   ASTNode,
   Continuation,

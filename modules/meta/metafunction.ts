@@ -64,7 +64,11 @@ const wrapHandler = (
   };
 };
 
-const toPromiseHandle = (m, n, dfd) => {
+const toPromiseHandle = (
+  dfd: ReturnType<typeof deferred>,
+  m?: Function,
+  n?: Function,
+) => {
   let promiseHandle;
   const mfn1 = n ? getMetaFunction(n as Function) : null;
   const mfn2 = m ? getMetaFunction(m as Function) : null;
@@ -101,9 +105,9 @@ function deferred() {
   ) => {
     const dfd = deferred();
     const promiseHandle = toPromiseHandle(
+      dfd,
       onfulfilled,
       onrejected,
-      dfd,
     );
 
     _then(
@@ -132,7 +136,7 @@ function deferred() {
         onRejected,
         dfd.resolve,
         dfd.reject,
-        toPromiseHandle(onRejected, undefined, dfd),
+        toPromiseHandle(dfd, onRejected, undefined),
       ),
     );
 

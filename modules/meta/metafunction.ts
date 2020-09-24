@@ -71,11 +71,18 @@ const toPromiseHandle = (
 ) => {
   const mfn1 = n ? getMetaFunction(n as Function) : null;
   const mfn2 = m ? getMetaFunction(m as Function) : null;
-  let mfn = mfn1 ?? mfn2;
+  let anyMfn = mfn1 ?? mfn2;
 
-  if (mfn) {
-    return mfn.config.asyncRuntime.registerPromise({
-      name: `${kind}(${mfn.e?.id?.name ?? `<fn>`})`,
+  if (anyMfn) {
+    const argNames = [
+      ...(mfn1 ? mfn1.e?.id?.name || [`<fn>`] : []),
+      ...(mfn2 ? mfn2.e?.id?.name || [`<fn>`] : []),
+    ].join(', ');
+
+    const name = `${kind}(${argNames})`;
+
+    return anyMfn.config.asyncRuntime.registerPromise({
+      name,
       type: kind,
       promise: dfd.promise,
     });

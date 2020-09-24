@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev_": "next",
-    "dev": "NODE_OPTIONS='--inspect' next",
+    "dev": "next",
+    "debug": "NODE_OPTIONS='--inspect' next",
     "build": "next build && yarn build:rss",
     "build:rss": "node ./scripts/buildRss.js",
     "export": "next export",

@@ -12,11 +12,11 @@ import {
   LineWidget,
   Position,
 } from 'codemirror';
+import { ErrorSymbol } from 'modules/meta/metafunction';
 import {
   StackFrame,
   EvaluationContext,
-  ErrorSymbol,
-} from 'modules/meta/engine';
+} from 'modules/meta/types';
 import {
   formatArgs,
   formatValue,
@@ -522,6 +522,10 @@ export function useEditorState() {
     editorItemsRef.current.commentLineWidget?.clear();
     editorItemsRef.current.reactLineWidget?.clear();
     editorItemsRef.current.marker?.clear();
+
+    editorItemsRef.current.editorWidgetsByFrame.forEach(
+      ({ widgets }) => widgets.forEach((w) => w.change()),
+    );
   };
 
   const clearEditor = () => {

@@ -1,13 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
+import {
+  PropsWithChildren,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import dynamic from 'next/dynamic';
 import { Editor } from 'codemirror';
 import Mousetrap from 'mousetrap';
-
 import {
   formatArgs,
   formatValue,
 } from 'helpers/formatValue';
-import { meta, StackFrame } from 'modules/meta/engine';
+import { meta } from 'modules/meta/engine';
+import { StackFrame } from 'modules/meta/types';
 import { useEditorState } from 'modules/meta/useEditorState';
 
 import code from '!!raw-loader!samples/async';
@@ -50,7 +55,29 @@ const GraphNode = ({
   );
 };
 
-const withCapture = (fn: Function) => {
+const AsyncTask = ({
+  children,
+  backgroundColor,
+}: PropsWithChildren<{
+  backgroundColor: string;
+}>) => (
+  <div
+    style={{
+      height: 56,
+      boxSizing: 'border-box',
+      padding: 8,
+      // width: 56,
+      border: '1px lightgray solid',
+      marginRight: 12,
+      fontSize: 10,
+      backgroundColor,
+    }}
+  >
+    {children}
+  </div>
+);
+
+const withKeyCapture = (fn: Function) => {
   return (e: Event) => {
     if (e.preventDefault) {
       e.preventDefault();
@@ -67,14 +94,14 @@ export default function Meta() {
   const update = () => forceUpdate({});
 
   useEffect(() => {
-    Mousetrap.bind('mod+s', withCapture(handleStep));
-    Mousetrap.bind('mod+a', withCapture(handleAutoStep));
+    Mousetrap.bind('mod+s', withKeyCapture(handleStep));
+    Mousetrap.bind('mod+a', withKeyCapture(handleAutoStep));
     Mousetrap.bind(
       'mod+d',
-      withCapture(handleAutoStepPause),
+      withKeyCapture(handleAutoStepPause),
     );
-    Mousetrap.bind('mod+x', withCapture(handleExit));
-    Mousetrap.bind('mod+z', withCapture(handleRestart));
+    Mousetrap.bind('mod+x', withKeyCapture(handleExit));
+    Mousetrap.bind('mod+z', withKeyCapture(handleRestart));
     return () => {
       'sadxz'
         .split('')
@@ -176,8 +203,7 @@ export default function Meta() {
   const {
     callsRootImmutableRef,
     callStack,
-    callbackQueue,
-    inFlightPromises,
+    asyncRuntime,
   } = metaRef.current.execState;
 
   // view helpers
@@ -271,6 +297,36 @@ export default function Meta() {
     </div>
   );
 
+  const asyncItems = [
+    // @ts-ignore
+    ...asyncRuntime.state.callbackQueue.map(
+      // @ts-ignore
+      ({ name, id }) => (
+        <AsyncTask key={id} backgroundColor="lightgreen">
+          {name}
+        </AsyncTask>
+      ),
+    ),
+    // @ts-ignore
+    ...asyncRuntime.state.inFlightPromises.map(
+      // @ts-ignore
+      ({ name, id }) => (
+        <AsyncTask key={id} backgroundColor="lightgray">
+          {name}
+        </AsyncTask>
+      ),
+    ),
+    // @ts-ignore
+    ...asyncRuntime.state.programTimers.map(
+      // @ts-ignore
+      ({ name, id }) => (
+        <AsyncTask key={id} backgroundColor="lightgray">
+          {name}
+        </AsyncTask>
+      ),
+    ),
+  ];
+
   const callbackQueueEl = (
     <div key="stack">
       <h2>The Event Loop</h2>
@@ -284,25 +340,7 @@ export default function Meta() {
           display: 'flex',
         }}
       >
-        {[
-          // ...(nextAsync ? [nextAsync.name] : []),
-          ...callbackQueue.map(({ name }) => name),
-          ...Array.from(inFlightPromises).map(
-            ({ name }) => name,
-          ),
-        ].map((name, i) => (
-          <div
-            key={i}
-            style={{
-              height: 56,
-              // width: 56,
-              border: '1px lightgray solid',
-              marginRight: 12,
-            }}
-          >
-            {name}
-          </div>
-        ))}
+        {asyncItems}
       </div>
     </div>
   );

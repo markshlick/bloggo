@@ -18,12 +18,10 @@ import {
   Environment,
 } from 'metaes/types';
 import * as NodeTypes from 'metaes/nodeTypes';
-import { ErrorSymbol } from './engine';
 
-type AsyncRuntime = {
-  enqueueCallback: (...args: any[]) => void;
-  registerPromise: (...args: any[]) => void;
-};
+export const ErrorSymbol = (typeof Symbol === 'function'
+  ? Symbol
+  : (_: string) => _)('__error__');
 
 const wrapHandler = (
   handler: Function,
@@ -45,6 +43,7 @@ const wrapHandler = (
         done,
         fail,
         promiseHandle,
+        promiseHandle.name ?? `<fn>`,
       );
 
       return;
@@ -65,26 +64,22 @@ const wrapHandler = (
 };
 
 const toPromiseHandle = (
+  kind: string,
   dfd: ReturnType<typeof deferred>,
   m?: Function,
   n?: Function,
 ) => {
-  let promiseHandle;
   const mfn1 = n ? getMetaFunction(n as Function) : null;
   const mfn2 = m ? getMetaFunction(m as Function) : null;
   let mfn = mfn1 ?? mfn2;
 
   if (mfn) {
-    promiseHandle = {
-      name: `then(${mfn.e?.id?.name ?? `<fn>`}()`,
-      type: 'Promise.then',
+    return mfn.config.asyncRuntime.registerPromise({
+      name: `${kind}(${mfn.e?.id?.name ?? `<fn>`})`,
+      type: kind,
       promise: dfd.promise,
-    };
-
-    mfn.config.asyncRuntime.registerPromise(promiseHandle);
+    });
   }
-
-  return promiseHandle;
 };
 
 function deferred() {
@@ -105,6 +100,7 @@ function deferred() {
   ) => {
     const dfd = deferred();
     const promiseHandle = toPromiseHandle(
+      'then',
       dfd,
       onfulfilled,
       onrejected,
@@ -136,7 +132,12 @@ function deferred() {
         onRejected,
         dfd.resolve,
         dfd.reject,
-        toPromiseHandle(dfd, onRejected, undefined),
+        toPromiseHandle(
+          'catch',
+          dfd,
+          onRejected,
+          undefined,
+        ),
       ),
     );
 

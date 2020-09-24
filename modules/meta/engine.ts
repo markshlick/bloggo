@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   Continuation,
   ErrorContinuation,
@@ -9,197 +8,28 @@ import {
   Interpreter,
 } from 'metaes/types';
 import { JavaScriptASTNode } from 'metaes/nodeTypes';
-import { ECMAScriptInterpreters } from 'metaes/interpreters';
 import { getMetaFunction } from 'metaes/metafunction';
 import { evaluate } from 'metaes/evaluate';
 import omit from 'lodash/omit';
-import {
-  ClassDeclaration,
-  ClassBody,
-  MethodDefinition,
-  GetProperty,
-  CallExpression,
-  SpreadElement,
-  Super,
-} from 'modules/meta/classIntepreters';
-import jsxInterpreters from 'modules/meta/jsxInterpreters';
 import { parseAndEvaluate } from 'modules/meta/evaluate';
+import { eventLoop } from 'modules/meta/eventLoop';
 import {
-  Apply,
-  ArrowFunctionExpression,
-  FunctionExpression,
-  FunctionDeclaration,
-  AwaitExpression,
-  TryStatement,
-} from 'modules/meta/metafunction';
-import { values } from 'lodash';
-
-type Timeout = (fn: () => void, ms: number) => number;
-
-const blockScopeTypes = [
-  'IfStatement',
-  'ForStatement',
-  'ForInStatement',
-  'ForOfStatement',
-  'WhileStatement',
-] as const;
-
-const prettyBlockScopeTypeNames: {
-  [name in typeof blockScopeTypes[number]]: string;
-} = {
-  IfStatement: 'if { }',
-  ForStatement: 'for { }',
-  ForInStatement: 'for { in }',
-  ForOfStatement: 'for { of }',
-  WhileStatement: 'while { }',
-};
-
-type ExecState = {
-  // awaitCount: number;
-  callStack: StackFrame[];
-  autoStepping: boolean;
-  running: boolean;
-  speed: number;
-  nextTimer?: number;
-  next?: () => any;
-  programTimers: Set<number>;
-  programIntervals: Set<number>;
-  inFlightPromises: Set<{
-    promise: Promise<unknown>;
-    name: string;
-    type: string;
-  }>;
-  allStackNodes: StackFrame[];
-  watchValues: WatchValues;
-  callsRootImmutableRef: StackFrame[];
-  programEnvKeys: string[];
-  callbackQueue: {
-    name: string;
-    type: string;
-    fn: () => any;
-  }[];
-};
-
-export type BlockFrame = {
-  id: string;
-  type: typeof blockScopeTypes;
-  sourceId?: string;
-  allBlocks: BlockFrame[];
-  calls: StackFrame[];
-  children: (BlockFrame | StackFrame)[];
-};
-
-export type StackFrame = {
-  children: (BlockFrame | StackFrame)[];
-  id: string;
-  name: string;
-  fnName: string;
-  args: any[];
-  values: {
-    [key: string]: any;
-  };
-  returnValue: any;
-  calls: StackFrame[];
-  origins: Record<string, ASTNode>;
-  hasReturned: boolean;
-  sourceId: string;
-  blockStack: BlockFrame[];
-  allBlocks: BlockFrame[];
-};
-
-export type WatchValues = Record<
-  string,
-  { frame: StackFrame; value: any }[]
->;
-
-export type Origin = {
-  node: ASTNode;
-  frame: StackFrame;
-};
-
-export type EvaluationContext = {
-  origin?: Origin;
-  previousFrame?: StackFrame;
-};
-
-export type Engine = {
-  speed: number;
-  handleError: (err: any) => void;
-  onEvaluation: (
-    evaluation: Evaluation,
-    frame: StackFrame,
-    context: EvaluationContext,
-  ) => void;
-  onPending: () => void;
-  update: () => void;
-};
-
-export const interestingTypes: NodeNames[] = [
-  'VariableDeclarator',
-  'CallExpression',
-  'AssignmentExpression',
-  'UpdateExpression',
-  'ConditionalExpression',
-  'ReturnStatement',
-  'IfStatement',
-  'ForStatement',
-  'ForInStatement',
-  'ForOfStatement',
-  'WhileStatement',
-  'AwaitExpression',
-  'Apply',
-  // 'ExpressionStatement',
-];
-
-const getInterpreters = () => {
-  return {
-    ...ECMAScriptInterpreters.values,
-    ...jsxInterpreters,
-    // async
-    Apply,
-    ArrowFunctionExpression,
-    FunctionExpression,
-    FunctionDeclaration,
-    AwaitExpression,
-    TryStatement,
-    // class
-    ClassDeclaration,
-    ClassBody,
-    MethodDefinition,
-    GetProperty,
-    CallExpression,
-    SpreadElement,
-    Super,
-  };
-};
-
-const globalObjects = {
-  Number,
-  Boolean,
-  Array,
-  Object,
-  Function,
-  String,
-  RegExp,
-  Date,
-  Math,
-  Map,
-  Set,
-  WeakMap,
-  WeakSet,
-  Error,
-  parseInt,
-  parseFloat,
-  isNaN,
-  JSON,
-  console,
-  Promise,
-  React,
-};
-
-type NodeNames =
-  | keyof typeof ECMAScriptInterpreters.values
-  | 'AwaitExpression';
+  StackFrame,
+  Engine,
+  ExecState,
+  EvaluationContext,
+  Timeout,
+  blockScopeTypes,
+  prettyBlockScopeTypeNames,
+  NodeNames,
+} from 'modules/meta/types';
+import {
+  getInterpreters,
+  interestingTypes,
+  globalObjects,
+  shouldSkipWaitOnEnterPhase,
+  shouldWaitOnValuePhase,
+} from 'modules/meta/config';
 
 const blankFrameState = () => ({
   origins: {},
@@ -221,10 +51,6 @@ const programFrame = (): StackFrame => ({
   sourceId: 'Program!',
 });
 
-export const ErrorSymbol = (typeof Symbol === 'function'
-  ? Symbol
-  : (_: string) => _)('__error__');
-
 export function meta({
   speed,
   handleError,
@@ -240,16 +66,20 @@ export function meta({
     running: false,
     next: undefined,
     nextTimer: undefined,
-    programTimers: new Set(),
-    programIntervals: new Set(),
-    inFlightPromises: new Set(),
-    watchValues: {},
     programEnvKeys: [],
-    callbackQueue: [],
     callStack: [],
     allStackNodes: [],
     // TODO: move this outside of this component
     callsRootImmutableRef: [],
+    asyncRuntime: eventLoop({
+      runMetaFunction: (
+        fn: Function,
+        args: any = [],
+        done?: Function,
+        fail?: Function,
+      ) => runMetaFunction(fn, args, done, fail),
+      handleEvaluationEnd: () => handleEvaluationEnd(),
+    }),
   };
 
   const emitEvaluation = (
@@ -263,40 +93,6 @@ export function meta({
         onEvaluation(evaluation, frame, context);
       } catch (error) {}
     }
-  };
-
-  const currentFrame = () =>
-    execState.callStack[execState.callStack.length - 1];
-
-  const prevFrame = () =>
-    execState.callStack[execState.callStack.length - 2];
-
-  const exceptionHandler = (exception: any) => {
-    if (exception.type === 'AsyncEnd') {
-      handleEvaluationEnd();
-    } else {
-      handleError(exception);
-    }
-  };
-
-  const registerPromise = (p: any) =>
-    execState.inFlightPromises.add(p);
-
-  const enqueueCallback = (
-    fn: Function,
-    args: any[],
-    done: Function,
-    fail: Function,
-    p: any,
-  ) => {
-    p && execState.inFlightPromises.delete(p);
-    execState.callbackQueue.push({
-      name: p?.name ?? '<fn>',
-      type: p?.type ?? '',
-      fn: () => runMetaFunction(fn, args, done, fail),
-    });
-
-    handleEvaluationEnd();
   };
 
   const runMetaFunction = (
@@ -329,32 +125,18 @@ export function meta({
     );
   };
 
-  const makeHooks = () => {
-    return {
-      clearTimeout: (timer: number, c: () => void) => {
-        execState.programTimers.delete(timer);
-        clearTimeout(timer);
-        c();
-      },
-      setTimeout: function (fn: Function, ms: number) {
-        const timer = (setTimeout as Timeout)(() => {
-          execState.programTimers.delete(timer);
+  const currentFrame = () =>
+    execState.callStack[execState.callStack.length - 1];
 
-          execState.callbackQueue.push({
-            name: 'setTimeout()',
-            type: 'Timeout',
-            fn: () => {
-              runMetaFunction(fn, []);
-            },
-          });
+  const prevFrame = () =>
+    execState.callStack[execState.callStack.length - 2];
 
-          handleEvaluationEnd();
-        }, ms);
-
-        execState.programTimers.add(timer);
-        return timer;
-      },
-    };
+  const exceptionHandler = (exception: any) => {
+    if (exception.type === 'AsyncEnd') {
+      handleEvaluationEnd();
+    } else {
+      handleError(exception);
+    }
   };
 
   const step = (
@@ -433,10 +215,11 @@ export function meta({
             env,
           };
 
-          handleAwait(
+          execState.asyncRuntime.handleAwait(
             node,
+            currentFrame(),
             err.value,
-            (value) => {
+            (value: any) => {
               emitEvaluation(
                 awaitEvaluation,
                 currentFrame(),
@@ -448,7 +231,7 @@ export function meta({
                 c(value);
               });
             },
-            (value) => {
+            (value: any) => {
               emitEvaluation(
                 awaitEvaluation,
                 currentFrame(),
@@ -519,33 +302,6 @@ export function meta({
     } else {
       enqueue(next);
     }
-  };
-
-  const shouldWaitOnValuePhase = (node: ASTNode) =>
-    node.type === 'Program' ||
-    node.type === 'VariableDeclarator' ||
-    node.type === 'AssignmentExpression' ||
-    // FIXME - override node types
-    // @ts-ignore
-    node.type === 'AwaitExpression';
-
-  const shouldSkipWaitOnEnterPhase = (node: ASTNode) => {
-    const isApplyWithoutMetaFn =
-      node.type === 'Apply' && !getMetaFunction(node.fn)?.e;
-
-    // TODO: expose this as a callback?
-    const skip =
-      // HACK: Program statements (not interesting) are handled as BlockStatements by the interpreter
-      node.type === 'Program' ||
-      node.type === 'VariableDeclarator' ||
-      node.type === 'ReturnStatement' ||
-      node.type === 'AssignmentExpression' ||
-      // node.type === 'ExpressionStatement' ||
-      // @ts-ignore
-      node.type === 'AwaitExpression' ||
-      isApplyWithoutMetaFn;
-
-    return skip;
   };
 
   const makeNodeHandlers = (names: NodeNames[]) => {
@@ -769,7 +525,6 @@ export function meta({
   const clearState = () => {
     execState.callStack = [];
     execState.allStackNodes = [];
-    execState.watchValues = {};
 
     // cheating a bit here to optimize react-d3-tree rendering
     // callsRootImmutableRef is an immutable *reference*
@@ -793,7 +548,7 @@ export function meta({
     execState.running = true;
 
     const programEnv = {
-      ...makeHooks(),
+      ...execState.asyncRuntime.actions,
       ...globalObjects,
     };
 
@@ -807,10 +562,7 @@ export function meta({
       programEnv,
       {
         handleEvaluationEnd,
-        asyncRuntime: {
-          enqueueCallback,
-          registerPromise,
-        },
+        asyncRuntime: execState.asyncRuntime,
         interceptor: updateStackState,
         interpreters: {
           prev: {
@@ -824,59 +576,13 @@ export function meta({
     );
   };
 
-  const handleAwait = (
-    node: ASTNode,
-    promise: Promise<unknown>,
-    c: Continuation,
-    cerr: ErrorContinuation,
-  ) => {
-    const p = {
-      name: `suspend ${currentFrame().fnName}()`,
-      type: 'AwaitSuspend',
-      promise,
-    };
-
-    promise.then(
-      (value: unknown) => {
-        // execState.awaitCount--;
-        execState.inFlightPromises.delete(p);
-        execState.callbackQueue.push({
-          name: `resume ${currentFrame().fnName}() `,
-          type: 'AsyncFunction',
-          fn: () => {
-            // execState.callStack = stack;
-            c(value);
-          },
-        });
-        if (!execState.next) handleEvaluationEnd();
-      },
-      (error) => {
-        execState.inFlightPromises.delete(p);
-        execState.callbackQueue.push({
-          name: `resume ${currentFrame().fnName}()`,
-
-          type: 'AsyncFunction',
-          fn: () => {
-            // execState.callStack = stack;
-            cerr(error);
-          },
-        });
-        if (!execState.next) handleEvaluationEnd();
-      },
-    );
-  };
-
   const handleEvaluationEnd = () => {
     if (execState.next) {
       return;
     }
 
-    const nextCb = execState.callbackQueue.shift();
-
-    if (nextCb !== undefined) {
-      nextCb.fn();
+    if (execState.asyncRuntime.handleTick()) {
       update();
-      return;
     }
 
     onPending();
@@ -887,18 +593,12 @@ export function meta({
     execState.nextTimer &&
       clearTimeout(execState.nextTimer);
 
-    execState.programTimers.forEach((t) => clearTimeout(t));
-    execState.programTimers = new Set();
-
-    execState.programIntervals.forEach((t) =>
-      clearInterval(t as any),
-    );
-    execState.programIntervals = new Set();
-
     execState.autoStepping = false;
     execState.running = false;
     execState.next = undefined;
     execState.nextTimer = undefined;
+
+    execState.asyncRuntime.reset();
 
     update();
   };
@@ -918,7 +618,6 @@ export function meta({
     execState,
     currentFrame,
     startExec,
-    handleEvaluationEnd,
     endExec,
     progressExec,
     setSpeed,

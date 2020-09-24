@@ -356,6 +356,13 @@ export function meta({
   };
 
   const updateStackState = (evaluation: Evaluation) => {
+    console.log(
+      evaluation.e.type,
+      evaluation.phase,
+      evaluation.e,
+      evaluation.env,
+    );
+
     // @ts-ignore
     if (evaluation.config.external) return;
 
@@ -412,8 +419,14 @@ export function meta({
     const fnName =
       evaluation.e?.e?.callee?.name ||
       evaluation.e?.e?.id?.name ||
-      evaluation.e?.e?.callee?.property.name ||
-      `<anonymous fn()>`;
+      (evaluation.e?.e?.callee?.object
+        ? (evaluation.e?.e?.callee?.object.type === 'Super'
+            ? `<super>`
+            : evaluation.e?.e?.callee?.object.name) +
+          '.' +
+          evaluation.e?.e?.callee?.property.name
+        : '') ||
+      `<fn()>`;
 
     if (evaluation.e.type === 'Apply') {
       if (evaluation.phase === 'enter') {

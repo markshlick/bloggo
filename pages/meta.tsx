@@ -55,7 +55,7 @@ const AsyncTask = ({
 }>) => (
   <div
     style={{
-      height: 56,
+      height: '100%',
       boxSizing: 'border-box',
       padding: 8,
       // width: 56,
@@ -323,10 +323,10 @@ export default function Meta() {
 
   const callbackQueueEl = (
     <div key="stack" className="space">
-      <h2>The Event Loop</h2>
+      <h3>The Event Loop</h3>
       <div
         style={{
-          height: '80px',
+          height: '65px',
           overflow: 'scroll',
           border: '1px lightgray solid',
           borderRadius: 4,
@@ -341,7 +341,7 @@ export default function Meta() {
 
   const stackFramesEl = (
     <div key="stack">
-      <h2>The Stack</h2>
+      <h3>The Stack</h3>
       <div
         style={{
           height: '300px',

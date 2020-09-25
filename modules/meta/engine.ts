@@ -4,13 +4,11 @@ import {
   Environment,
   EvaluationConfig,
   Evaluation,
-  ASTNode,
   Interpreter,
 } from 'metaes/types';
 import { JavaScriptASTNode } from 'metaes/nodeTypes';
 import { getMetaFunction } from 'metaes/metafunction';
 import { evaluate } from 'metaes/evaluate';
-import omit from 'lodash/omit';
 import { parseAndEvaluate } from 'modules/meta/evaluate';
 import { eventLoop } from 'modules/meta/eventLoop';
 import {
@@ -22,6 +20,8 @@ import {
   blockScopeTypes,
   prettyBlockScopeTypeNames,
   NodeNames,
+  BlockFrame,
+  FrameMeta,
 } from 'modules/meta/types';
 import {
   getInterpreters,
@@ -61,16 +61,12 @@ export function meta({
   // helpers
   const execState: ExecState = {
     speed,
-    // awaitCount: 0,
     autoStepping: false,
     running: false,
     next: undefined,
     nextTimer: undefined,
     programEnvKeys: [],
-    callStack: [],
     allStackNodes: [],
-    // TODO: move this outside of this component
-    callsRootImmutableRef: [],
     asyncRuntime: eventLoop({
       runMetaFunction: (
         fn: Function,
@@ -80,6 +76,12 @@ export function meta({
       ) => runMetaFunction(fn, args, done, fail),
       handleEvaluationEnd: () => handleEvaluationEnd(),
     }),
+    flow: {
+      allBlocks: new Map(),
+      allFrames: new Map(),
+      frameMeta: new Map(),
+    },
+    stackFrames: [],
   };
 
   const emitEvaluation = (
@@ -103,7 +105,6 @@ export function meta({
   ) => {
     const { e, closure, config } = getMetaFunction(fn);
 
-    execState.callStack = [...closure.stack];
     evaluate(
       { e, fn, type: 'Apply', args },
       (value) => {
@@ -126,10 +127,12 @@ export function meta({
   };
 
   const currentFrame = () =>
-    execState.callStack[execState.callStack.length - 1];
+    execState.stackFrames[execState.stackFrames.length - 1]
+      .frame;
 
   const prevFrame = () =>
-    execState.callStack[execState.callStack.length - 2];
+    execState.stackFrames[execState.stackFrames.length - 2]
+      ?.frame;
 
   const exceptionHandler = (exception: any) => {
     if (exception.type === 'AsyncEnd') {
@@ -206,7 +209,7 @@ export function meta({
           err.type === 'ReturnStatement';
 
         if (isAwait) {
-          const awaitEvaluation: Evaluation = {
+          const resumeEvaluation: Evaluation = {
             e: node,
             // @ts-ignore
             phase: 'resume',
@@ -215,31 +218,34 @@ export function meta({
             env,
           };
 
+          const frames = [...execState.stackFrames];
           execState.asyncRuntime.handleAwait(
             node,
             currentFrame(),
             err.value,
             (value: any) => {
+              execState.stackFrames = frames;
+              update();
               emitEvaluation(
-                awaitEvaluation,
+                resumeEvaluation,
                 currentFrame(),
                 {},
               );
               enqueue(() => {
                 execState.next = undefined;
-                execState.callStack = env.stack;
                 c(value);
               });
             },
             (value: any) => {
+              execState.stackFrames = frames;
+              update();
               emitEvaluation(
-                awaitEvaluation,
+                resumeEvaluation,
                 currentFrame(),
                 {},
               );
               enqueue(() => {
                 execState.next = undefined;
-                execState.callStack = env.stack;
                 cerr({
                   type: 'ThrowStatement',
                   value: value,
@@ -334,18 +340,27 @@ export function meta({
   };
 
   const currentBlock = () => {
-    const frame = currentFrame();
-    return frame.blockStack[frame.blockStack.length - 1];
+    const f =
+      execState.stackFrames[
+        execState.stackFrames.length - 1
+      ];
+
+    const b = f.blockStack[f.blockStack.length - 1];
+
+    return b;
   };
 
   const getOrigin = (name: string) => {
     for (
-      let index = execState.callStack.length - 1;
+      let index = execState.stackFrames.length - 1;
       index >= 0;
       index--
     ) {
-      const frame = execState.callStack[index];
-      const node = frame.origins[name];
+      const frame = execState.stackFrames[index].frame;
+      const node = execState.flow.frameMeta
+        .get(frame.id)
+        ?.origins.get(name);
+
       if (node) {
         return {
           node,
@@ -355,104 +370,143 @@ export function meta({
     }
   };
 
-  const interceptor = (evaluation: Evaluation) => {
-    // console.log(
-    //   evaluation.e.type,
-    //   evaluation.phase,
-    //   evaluation.e,
-    //   evaluation.env,
-    // );
+  const fnName = (evaluation: Evaluation) =>
+    evaluation.e?.e?.callee?.name ||
+    evaluation.e?.e?.id?.name ||
+    (evaluation.e?.e?.callee?.object
+      ? (evaluation.e?.e?.callee?.object.type === 'Super'
+          ? `<super>`
+          : evaluation.e?.e?.callee?.object.name) +
+        '.' +
+        evaluation.e?.e?.callee?.property.name
+      : '') ||
+    `<fn()>`;
 
-    // @ts-ignore
-    if (evaluation.config.external) return;
-
-    const frame = currentFrame();
-    // @ts-ignore
-    if (!evaluation.env.stack) {
-      // @ts-ignore
-      evaluation.env.stack = [...execState.callStack];
-    }
-    // @ts-ignore
-    if (!evaluation.env.blockStack) {
-      // @ts-ignore
-      evaluation.env.blockStack ??= [...frame.blockStack];
-    }
-
+  const recordBlock = (evaluation: Evaluation) => {
     const evaluationType = evaluation.e.type;
     if (blockScopeTypes.includes(evaluationType)) {
-      const stackFrame = currentFrame();
       if (evaluation.phase === 'enter') {
-        const blockFrame = {
+        const stackFrame = currentFrame();
+        const prevBlock = currentBlock();
+        const { flow } = execState;
+
+        const block = {
           // @ts-ignore
           fnName: prettyBlockScopeTypeNames[evaluationType],
-          id: `${stackFrame.id}-${stackFrame.allBlocks.length}`,
+          id: `${stackFrame.id}-${flow.allBlocks.size}`,
           type: evaluation.e.type,
           sourceId: evaluation.e.range?.join(),
-          allBlocks: [],
-          calls: [],
-          children: [],
+          node: evaluation.e,
         };
 
-        const prevBlock = currentBlock();
+        flow.frameMeta.set(block.id, createFrameMeta());
+        prevBlock &&
+          flow.frameMeta
+            .get(prevBlock.id)
+            ?.blocks.push(block.id);
+        flow.allBlocks.set(block.id, block);
 
-        if (!prevBlock) {
-          stackFrame.allBlocks.push(blockFrame);
-          stackFrame.children.push(blockFrame);
-        } else {
-          prevBlock.allBlocks.push(blockFrame);
-          prevBlock.children.push(blockFrame);
-        }
-
-        execState.callsRootImmutableRef = [
-          ...execState.callsRootImmutableRef,
-        ];
-
-        stackFrame.blockStack.push(blockFrame);
-
-        // displayBlockEnter(evaluation, blockFrame, frame);
+        pushBlockFrame(block);
       } else {
-        // displayBlockExit(evaluation, blockFrame, frame);
-        stackFrame.blockStack.pop();
+        popBlockFrame();
       }
     }
+  };
 
-    const fnName =
-      evaluation.e?.e?.callee?.name ||
-      evaluation.e?.e?.id?.name ||
-      (evaluation.e?.e?.callee?.object
-        ? (evaluation.e?.e?.callee?.object.type === 'Super'
-            ? `<super>`
-            : evaluation.e?.e?.callee?.object.name) +
-          '.' +
-          evaluation.e?.e?.callee?.property.name
-        : '') ||
-      `<fn()>`;
+  const pushBlockFrame = (block: BlockFrame) => {
+    const lastFrame =
+      execState.stackFrames[
+        execState.stackFrames.length - 1
+      ];
 
+    const newLastFrame = {
+      ...lastFrame,
+      blockStack: [...lastFrame.blockStack, block],
+    };
+
+    const newStackFrames = [
+      ...execState.stackFrames.slice(0, -1),
+      newLastFrame,
+    ];
+
+    execState.stackFrames = newStackFrames;
+  };
+
+  const popBlockFrame = () => {
+    const lastFrame =
+      execState.stackFrames[
+        execState.stackFrames.length - 1
+      ];
+
+    const newLastFrame = {
+      ...lastFrame,
+      blockStack: lastFrame.blockStack.slice(0, -1),
+    };
+
+    const newStackFrames = [
+      ...execState.stackFrames.slice(0, -1),
+      newLastFrame,
+    ];
+
+    execState.stackFrames = newStackFrames;
+  };
+
+  const createFrameMeta = (args?: any): FrameMeta => ({
+    args,
+    origins: new Map(),
+    blocks: [] as string[],
+    calls: [] as string[],
+    returnValue: undefined,
+    hasReturned: false,
+  });
+
+  const recordCallMeta = (
+    args: any[],
+    prevFrame: StackFrame,
+    frame: StackFrame,
+    currentBlock?: BlockFrame,
+  ) => {
+    const { flow } = execState;
+    flow.frameMeta.set(frame.id, createFrameMeta(args));
+    flow.frameMeta.get(prevFrame.id)?.calls.push(frame.id);
+    currentBlock &&
+      flow.frameMeta
+        .get(currentBlock.id)
+        ?.calls.push(frame.id);
+    flow.allFrames.set(frame.id, frame);
+  };
+
+  const createFrame = (
+    evaluation: Evaluation,
+  ): StackFrame => {
+    const metaFn = getMetaFunction(evaluation.e.fn)?.e;
+
+    const id = `${execState.flow.allFrames.size}`;
+
+    const frame = {
+      ...blankFrameState(),
+      fnName: fnName(evaluation),
+      id,
+      name: id,
+      sourceId: metaFn?.range?.join(),
+      node: evaluation.e,
+    };
+
+    return frame;
+  };
+
+  const recordCall = (evaluation: Evaluation) => {
     if (evaluation.e.type === 'Apply') {
       if (evaluation.phase === 'enter') {
-        const metaFn = getMetaFunction(evaluation.e.fn)?.e;
-
-        const id = `${execState.allStackNodes.length}`;
-        const frame = {
-          ...blankFrameState(),
-          fnName,
-          id,
-          name: id,
-          args: evaluation.e.args,
-          sourceId: metaFn?.range?.join(),
-          env: evaluation.env,
-        };
-
-        currentFrame().calls.push(frame);
-        currentBlock()?.calls.push(frame);
-        (currentBlock() || currentFrame())?.children.push(
+        const frame = createFrame(evaluation);
+        recordCallMeta(
+          evaluation.e.args,
+          currentFrame(),
           frame,
         );
-
-        execState.callStack.push(frame);
-        execState.allStackNodes.push(frame);
-        execState.callsRootImmutableRef = [
-          ...execState.callsRootImmutableRef,
+        execState.stackFrames = [
+          ...execState.stackFrames,
+          { blockStack: [], frame },
         ];
 
         emitEvaluation(
@@ -465,8 +519,13 @@ export function meta({
           { previousFrame: prevFrame() },
         );
       } else {
-        currentFrame().hasReturned = true;
-        currentFrame().returnValue = evaluation.value;
+        const frame = execState.flow.frameMeta.get(
+          currentFrame().id,
+        );
+        if (frame) {
+          frame.returnValue = evaluation.value;
+          frame.hasReturned = true;
+        }
 
         emitEvaluation(
           {
@@ -478,50 +537,53 @@ export function meta({
           { previousFrame: prevFrame() },
         );
 
-        execState.callStack.pop();
-        execState.callsRootImmutableRef = [
-          ...execState.callsRootImmutableRef,
-        ];
-      }
-    } else {
-      const frame = currentFrame();
-
-      if (frame.id === '-1') {
-        const values = omit(
-          evaluation.env?.values ?? {},
-          execState.programEnvKeys,
+        execState.stackFrames = execState.stackFrames.slice(
+          0,
+          -1,
         );
-
-        frame.values = { ...frame.values, ...values };
-      } else {
-        let values = {};
-        let env = evaluation.env;
-        // // HACK
-        // // @ts-ignore
-        while (
-          env &&
-          env.stack[env.stack.length - 1] === frame
-        ) {
-          values = { ...values, ...env.values };
-          env = env.prev;
-        }
-        frame.values = values;
       }
     }
+  };
+
+  const recordOrigin = (evaluation: Evaluation) => {
+    const { flow } = execState;
 
     if (
       evaluation.phase === 'enter' &&
       evaluation.e.type === 'VariableDeclarator'
     ) {
       const frame = currentFrame();
+      const block = currentBlock();
       const declaration = evaluation.e;
       if (
         declaration.id &&
         declaration.id.type === 'Identifier'
       ) {
-        frame.origins[declaration.id.name] = evaluation.e;
+        const name = declaration.id.name;
+        flow.frameMeta
+          .get(frame.id)
+          ?.origins.set(name, evaluation.e);
+        block &&
+          flow.frameMeta
+            .get(block.id)
+            ?.origins.set(name, evaluation.e);
       }
     }
+  };
+
+  const interceptor = (evaluation: Evaluation) => {
+    console.info(
+      evaluation.e.type,
+      evaluation.phase,
+      evaluation,
+    );
+
+    // @ts-ignore
+    if (evaluation.config.external) return;
+
+    recordBlock(evaluation);
+    recordCall(evaluation);
+    recordOrigin(evaluation);
 
     const isInteresting = interestingTypes.includes(
       evaluation.e.type,
@@ -536,14 +598,7 @@ export function meta({
   };
 
   const clearState = () => {
-    execState.callStack = [];
-    execState.allStackNodes = [];
-
-    // cheating a bit here to optimize react-d3-tree rendering
-    // callsRootImmutableRef is an immutable *reference*
-    // BUT it's values mutate
-    // NOTE - it will not be reassigned if stack frame variable change
-    execState.callsRootImmutableRef = [];
+    execState.stackFrames = [];
   };
 
   // exec
@@ -555,9 +610,9 @@ export function meta({
 
     clearState();
     const rootFrame = programFrame();
-    execState.callStack = [rootFrame];
-    execState.callsRootImmutableRef = [rootFrame];
-
+    execState.stackFrames = [
+      { frame: rootFrame, blockStack: [] },
+    ];
     execState.running = true;
 
     const programEnv = {

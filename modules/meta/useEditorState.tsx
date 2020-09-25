@@ -369,7 +369,7 @@ export function useEditorState() {
       if (evaluation.e.loc) {
         markEditor(evaluation);
       }
-      displayComments(evaluation.e, evaluation);
+      // displayComments(evaluation.e, evaluation);
     }
 
     if (
@@ -472,7 +472,7 @@ export function useEditorState() {
     } else if (
       evaluation.e.type === 'Apply' &&
       // @ts-ignore
-      evaluation.phase === 'enter-after'
+      evaluation.phase === 'enter'
     ) {
       editorItemsRef.current.commentLineWidget?.clear();
       // const nodes = getFrameWidgets(prevFrame);
@@ -481,7 +481,7 @@ export function useEditorState() {
 
       const metaFn = getMetaFunction(evaluation.e.fn)?.e;
       if (metaFn) {
-        displayComments(metaFn, evaluation);
+        // displayComments(metaFn, evaluation);
 
         displayInlineValue(
           metaFn,
@@ -493,6 +493,14 @@ export function useEditorState() {
           markEditor({ ...evaluation, e: metaFn.id });
         }
       }
+    } else if (
+      evaluation.e.type === 'CallExpression' &&
+      // @ts-ignore
+      evaluation.phase === 'exit' &&
+      evaluation.value?.[ErrorSymbol] &&
+      evaluation.value?.type === 'AsyncEnd'
+    ) {
+      editorItemsRef.current.marker?.clear();
     }
 
     editorItemsRef.current.editorWidgetsByFrame.forEach(
@@ -542,7 +550,7 @@ export function useEditorState() {
     editorRef.current?.getDoc().getValue();
 
   const onPending = () => {
-    clearCurrentMarker();
+    // clearCurrentMarker();
   };
 
   return {

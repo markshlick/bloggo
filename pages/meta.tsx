@@ -7,15 +7,12 @@ import {
 import dynamic from 'next/dynamic';
 import { Editor } from 'codemirror';
 import Mousetrap from 'mousetrap';
-import {
-  formatArgs,
-  formatValue,
-} from 'helpers/formatValue';
+
 import { meta } from 'modules/meta/engine';
 import { StackFrame } from 'modules/meta/types';
 import { useEditorState } from 'modules/meta/useEditorState';
 
-import code from '!!raw-loader!samples/async';
+import code from '!!raw-loader!samples/async-loop';
 
 const Tree = dynamic(import('react-d3-tree'), {
   ssr: false,
@@ -44,12 +41,7 @@ const GraphNode = ({
   return (
     <div>
       {nodeData ? (
-        <strong>
-          {nodeData?.fnName}
-          {nodeData?.args
-            ? `(${formatArgs(nodeData?.args)})`
-            : ''}
-        </strong>
+        <strong>{nodeData?.fnName}</strong>
       ) : null}
     </div>
   );
@@ -73,7 +65,7 @@ const AsyncTask = ({
       backgroundColor,
     }}
   >
-    {children}
+    <h4>{children}</h4>
   </div>
 );
 
@@ -94,16 +86,16 @@ export default function Meta() {
   const update = () => forceUpdate({});
 
   useEffect(() => {
-    Mousetrap.bind('mod+s', withKeyCapture(handleStep));
-    Mousetrap.bind('mod+a', withKeyCapture(handleAutoStep));
+    Mousetrap.bind('mod+j', withKeyCapture(handleStep));
+    Mousetrap.bind('mod+k', withKeyCapture(handleAutoStep));
     Mousetrap.bind(
-      'mod+d',
+      'mod+l',
       withKeyCapture(handleAutoStepPause),
     );
-    Mousetrap.bind('mod+x', withKeyCapture(handleExit));
-    Mousetrap.bind('mod+z', withKeyCapture(handleRestart));
+    Mousetrap.bind('mod+u', withKeyCapture(handleExit));
+    Mousetrap.bind('mod+i', withKeyCapture(handleRestart));
     return () => {
-      'sadxz'
+      'jlkui'
         .split('')
         .forEach((c) => Mousetrap.unbind('mod+' + c));
     };
@@ -201,8 +193,7 @@ export default function Meta() {
   );
 
   const {
-    callsRootImmutableRef,
-    callStack,
+    stackFrames,
     asyncRuntime,
   } = metaRef.current.execState;
 
@@ -243,7 +234,7 @@ export default function Meta() {
         disabled={isStepDisabled()}
         onClick={handleStep}
       >
-        Step (&#8984;S)
+        Step (&#8984;J)
       </button>
       {' | '}
       <button
@@ -251,29 +242,29 @@ export default function Meta() {
         disabled={isStepDisabled()}
         onClick={handleAutoStep}
       >
-        Auto-step (&#8984;A)
+        Auto-step (&#8984;K)
       </button>{' '}
       <button
         className="smaller"
         disabled={isPauseDisabled()}
         onClick={handleAutoStepPause}
       >
-        Pause (&#8984;D)
+        Pause (&#8984;L)
       </button>
       {' | '}
       <button
         className="smaller"
         disabled={isExitDisabled()}
-        onClick={handleRestart}
+        onClick={handleExit}
       >
-        Restart (&#8984;Z)
+        Exit (&#8984;U)
       </button>{' '}
       <button
         className="smaller"
         disabled={isExitDisabled()}
-        onClick={handleExit}
+        onClick={handleRestart}
       >
-        Exit (&#8984;X)
+        Restart (&#8984;I)
       </button>
     </div>
   );
@@ -328,7 +319,7 @@ export default function Meta() {
   ];
 
   const callbackQueueEl = (
-    <div key="stack">
+    <div key="stack" className="space">
       <h2>The Event Loop</h2>
       <div
         style={{
@@ -345,7 +336,7 @@ export default function Meta() {
     </div>
   );
 
-  const callStackEl = (
+  const stackFramesEl = (
     <div key="stack">
       <h2>The Stack</h2>
       <div
@@ -357,69 +348,55 @@ export default function Meta() {
           padding: 12,
         }}
       >
-        {[...callStack]
+        {[...stackFrames]
           .reverse()
-          .map(
-            (
-              {
-                id,
-                fnName,
-                args,
-                values,
-                returnValue,
-                hasReturned,
-              },
-              i,
-            ) => {
-              const {
-                this: _1,
-                arguments: _2,
-                ...restValues
-              } = values;
-              return (
+          .map(({ frame, blockStack }, i) => {
+            const { id, fnName } = frame;
+
+            return (
+              <>
+                {[...blockStack].reverse().map((block) => {
+                  const {
+                    id,
+                    // @ts-ignore
+                    fnName,
+                  } = block;
+                  return (
+                    <div
+                      key={id}
+                      className="space-small"
+                      style={{
+                        border: '1px lightgray solid',
+                        backgroundColor: 'lightcyan',
+                        borderRadius: 4,
+                        padding: '8px 12px',
+                      }}
+                    >
+                      <h5 className="no-space">
+                        [{stackFrames.length - i}]{' '}
+                        <em>{fnName}</em>
+                      </h5>
+                    </div>
+                  );
+                })}
                 <div
                   key={id}
                   className="space-small"
                   style={{
                     border: '1px lightgray solid',
+                    backgroundColor: 'lightsteelblue',
                     borderRadius: 4,
                     padding: 12,
                   }}
                 >
                   <h4 className="no-space">
-                    [{callStack.length - i}]{' '}
-                    <em>
-                      {fnName}({formatArgs(args)})
-                    </em>
+                    [{stackFrames.length - i}]{' '}
+                    <em>{fnName}()</em>
                   </h4>
-                  <div style={{ marginLeft: 8 }}>
-                    {Object.entries(restValues).map(
-                      ([name, value]) => (
-                        <div key={name}>
-                          <small>
-                            <strong>{name} = </strong>
-                            <em>{formatValue(value)}</em>
-                          </small>
-                        </div>
-                      ),
-                    )}
-                    {hasReturned && (
-                      <div key="return">
-                        <small>
-                          <strong>{'<='} </strong>
-                          <em>
-                            {formatValue(
-                              returnValue?.value,
-                            )}
-                          </em>
-                        </small>
-                      </div>
-                    )}
-                  </div>
                 </div>
-              );
-            },
-          )}
+              </>
+            );
+          })}
       </div>
     </div>
   );
@@ -434,18 +411,34 @@ export default function Meta() {
           borderRadius: 4,
         }}
       >
-        {callsRootImmutableRef.length ? (
+        {true ? (
           <Tree
             translate={{ x: 100, y: 100 }}
             zoom={0.5}
             orientation="vertical"
             transitionDuration={0}
             collapsible={false}
-            data={callsRootImmutableRef}
+            data={[
+              {
+                name: '1',
+                // @ts-ignore
+                fnName: 'hi',
+                get children() {
+                  return [
+                    {
+                      name: '2',
+                      fnName: 'hi',
+                      children: [],
+                    },
+                  ];
+                },
+              },
+            ]}
             allowForeignObjects
             nodeLabelComponent={{
               foreignObjectWrapper: {
-                y: 24,
+                y: -14,
+                x: 15,
               },
               render: <GraphNode />,
             }}
@@ -480,7 +473,7 @@ export default function Meta() {
           gridGap: '20px',
         }}
       >
-        {callStackEl}
+        {stackFramesEl}
         {/* {callGraphEl} */}
       </div>
     </div>
@@ -489,59 +482,3 @@ export default function Meta() {
 
 // @ts-ignore
 Meta.layout = null;
-
-// function valueTableEl() {
-//   const indexerName = 'Input';
-//   const valueName = '';
-
-//   const tableValues: number[] = [];
-
-//   const filledArr = Array(tableValues.length).fill(null);
-
-//   return (
-//     <div key="table" className="space">
-//       <h2>Values</h2>
-//       <div
-//         style={{
-//           overflow: 'scroll',
-//           border: '1px lightgray solid',
-//           borderRadius: 4,
-//           padding: 12,
-//         }}
-//       >
-//         <table>
-//           <tbody>
-//             <tr>
-//               <th
-//                 scope="row"
-//                 align="left"
-//                 style={{ padding: 4 }}
-//               >
-//                 {indexerName}
-//               </th>
-//               {filledArr.map((n, i) => (
-//                 <td key={i} style={{ padding: 4 }}>
-//                   {i}
-//                 </td>
-//               ))}
-//             </tr>
-//             <tr>
-//               <th
-//                 scope="row"
-//                 align="left"
-//                 style={{ padding: 4 }}
-//               >
-//                 {valueName}
-//               </th>
-//               {filledArr.map((n, i) => (
-//                 <td key={i} style={{ padding: 4 }}>
-//                   {tableValues[i]}
-//                 </td>
-//               ))}
-//             </tr>
-//           </tbody>
-//         </table>
-//       </div>
-//     </div>
-//   );
-// }

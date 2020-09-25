@@ -1,22 +1,14 @@
 async function a() {
-  console.log('before a() await');
   const r = await b();
-  console.log('x value', r);
-  console.log('after a() await');
   return r;
 }
 
 async function b() {
-  console.log('before b() await');
   const r = await Promise.resolve('hi!');
-  console.log('after b() await');
   return r;
 }
 
-console.log('before a()');
 const r = a();
-console.log('a return', r);
-console.log('after a()');
 
 async function c(v) {
   return await Promise.resolve(v);
@@ -41,7 +33,7 @@ async function z(v) {
 function x() {
   let a = 1;
   function y(v) {
-    console.log({ v, a });
+    return v;
   }
   z(a).then(y);
   a = 2;

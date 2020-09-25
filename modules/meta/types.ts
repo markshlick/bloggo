@@ -40,27 +40,41 @@ type AsyncRuntime = {
   };
 };
 
+export type FrameMeta = {
+  calls: string[];
+  blocks: string[];
+  origins: Map<string, ASTNode>;
+  hasReturned: boolean;
+  returnValue: any;
+  args: any[] | undefined;
+};
+
 export type ExecState = {
   // awaitCount: number;
   asyncRuntime: AsyncRuntime;
-  callStack: StackFrame[];
   autoStepping: boolean;
   running: boolean;
   speed: number;
   nextTimer?: number;
   next?: () => any;
   allStackNodes: StackFrame[];
-  callsRootImmutableRef: StackFrame[];
   programEnvKeys: string[];
+  flow: {
+    allFrames: Map<string, StackFrame>;
+    allBlocks: Map<string, BlockFrame>;
+    frameMeta: Map<string, FrameMeta>;
+  };
+  stackFrames: {
+    frame: StackFrame;
+    blockStack: BlockFrame[];
+  }[];
 };
 
 export type BlockFrame = {
   id: string;
   type: typeof blockScopeTypes;
   sourceId?: string;
-  allBlocks: BlockFrame[];
-  calls: StackFrame[];
-  children: (BlockFrame | StackFrame)[];
+  node: ASTNode;
 };
 
 export type StackFrame = {
@@ -68,17 +82,7 @@ export type StackFrame = {
   id: string;
   name: string;
   fnName: string;
-  args: any[];
-  values: {
-    [key: string]: any;
-  };
-  returnValue: any;
-  calls: StackFrame[];
-  origins: Record<string, ASTNode>;
-  hasReturned: boolean;
   sourceId: string;
-  blockStack: BlockFrame[];
-  allBlocks: BlockFrame[];
 };
 
 export type WatchValues = Record<

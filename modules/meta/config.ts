@@ -1,9 +1,7 @@
 import { ECMAScriptInterpreters } from 'metaes/interpreters';
 import { getMetaFunction } from 'metaes/metafunction';
 import { ASTNode } from 'metaes/types';
-
 import { NodeNames } from 'modules/meta/types';
-
 import {
   ClassDeclaration,
   ClassBody,
@@ -12,7 +10,7 @@ import {
   CallExpression,
   SpreadElement,
   Super,
-} from 'modules/meta/classIntepreters';
+} from 'modules/meta/interpreters/classIntepreters';
 import {
   ArrowFunctionExpression,
   FunctionExpression,
@@ -20,14 +18,13 @@ import {
   AwaitExpression,
   TryStatement,
   Apply,
-} from 'modules/meta/asyncInterpreters';
-import jsxInterpreters from 'modules/meta/jsxInterpreters';
-
+} from 'modules/meta/interpreters/asyncInterpreters';
+import jsxInterpreters from 'modules/meta/interpreters/jsxInterpreters';
 import {
   SetValue,
   AssignmentExpression,
-} from 'modules/meta/envInterpreters';
-import { ForInStatement } from './statementInterpreters';
+} from 'modules/meta/interpreters/envInterpreters';
+import { ForInStatement } from 'modules/meta/interpreters/statementInterpreters';
 
 export const interestingTypes: NodeNames[] = [
   'VariableDeclarator',

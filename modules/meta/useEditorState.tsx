@@ -489,9 +489,10 @@ export function useEditorState() {
           `(${formatArgs(evaluation.e.args)})`,
         );
 
-        if (metaFn.id) {
-          markEditor({ ...evaluation, e: metaFn.id });
-        }
+        markEditor({
+          ...evaluation,
+          e: metaFn.id ?? metaFn,
+        });
       }
     } else if (
       evaluation.e.type === 'CallExpression' &&

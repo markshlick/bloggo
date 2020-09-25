@@ -12,7 +12,7 @@ import { meta } from 'modules/meta/engine';
 import { StackFrame } from 'modules/meta/types';
 import { useEditorState } from 'modules/meta/useEditorState';
 
-import code from '!!raw-loader!samples/async-loop';
+import code from '!!raw-loader!samples/async';
 
 const Tree = dynamic(import('react-d3-tree'), {
   ssr: false,
@@ -203,7 +203,10 @@ export default function Meta() {
     <CodeEditor
       key="code"
       editorDidMount={handleEditorDidMount}
-      value={code}
+      value={
+        `// 👋🏽 psst! you can edit and run this code!\n\n` +
+        code
+      }
       options={{
         // readOnly: metaRef.current.execState.running,
         lineNumbers: true,
@@ -448,17 +451,36 @@ export default function Meta() {
     </div>
   );
 
+  const runningState = () => {
+    const { execState } = metaRef.current;
+    if (!execState.running) {
+      return 'Not running';
+    } else if (execState.autoStepping) {
+      return 'Auto-stepping';
+    } else {
+      return 'Running';
+    }
+  };
+
   return (
     <div style={{ margin: '20px auto', maxWidth: 840 }}>
       <title>
         HyperScript :: Learnable CS with JavaScript
       </title>
-      <div key="editor" className="space">
-        <div
-          style={{ height: '30vh', minHeight: 400 }}
-          className="space-small"
-        >
-          {editorEl}
+      <div key="main" className="space">
+        <div className="space">
+          <div
+            key="editor"
+            style={{ height: '30vh', minHeight: 400 }}
+          >
+            {editorEl}
+          </div>
+          <div key="state">
+            <small>
+              <strong>Program state:</strong>{' '}
+              <em>{runningState()}</em>
+            </small>
+          </div>
         </div>
         {buttonsEl}
         {playbackEl}

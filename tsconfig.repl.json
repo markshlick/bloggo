@@ -1,8 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "isolatedModules": false,
-    "module": "CommonJS"
-  },
-  "exclude": ["node_modules"]
+    "module": "CommonJS",
+    "target": "es2017"
+  }
 }

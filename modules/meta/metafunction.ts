@@ -7,7 +7,6 @@ import {
 import { FunctionNode } from 'metaes/nodeTypes';
 import {
   markAsMetaFunction,
-  isMetaFunction,
   getMetaFunction,
 } from 'metaes/metafunction';
 import {

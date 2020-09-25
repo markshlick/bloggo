@@ -23,6 +23,12 @@ import {
 } from 'modules/meta/asyncInterpreters';
 import jsxInterpreters from 'modules/meta/jsxInterpreters';
 
+import {
+  SetValue,
+  AssignmentExpression,
+} from 'modules/meta/envInterpreters';
+import { ForInStatement } from './statementInterpreters';
+
 export const interestingTypes: NodeNames[] = [
   'VariableDeclarator',
   'CallExpression',
@@ -40,27 +46,34 @@ export const interestingTypes: NodeNames[] = [
   'CatchClause',
 ];
 
-export const getInterpreters = () => {
-  return {
-    ...ECMAScriptInterpreters.values,
-    ...jsxInterpreters,
-    // async
-    Apply,
-    ArrowFunctionExpression,
-    FunctionExpression,
-    FunctionDeclaration,
-    AwaitExpression,
-    TryStatement,
-    // class
-    ClassDeclaration,
-    ClassBody,
-    MethodDefinition,
-    GetProperty,
-    CallExpression,
-    SpreadElement,
-    Super,
-  };
+export const interpreters = {
+  ...ECMAScriptInterpreters.values,
+  ...jsxInterpreters,
+  // async
+  Apply,
+  ArrowFunctionExpression,
+  FunctionExpression,
+  FunctionDeclaration,
+  AwaitExpression,
+  TryStatement,
+  // class
+  ClassDeclaration,
+  ClassBody,
+  MethodDefinition,
+  GetProperty,
+  CallExpression,
+  SpreadElement,
+  Super,
+  //
+  SetValue,
+  AssignmentExpression,
+  ForInStatement,
 };
+
+export const getInterpreters = () => {
+  return interpreters;
+};
+
 export const globalObjects = {
   Number,
   Boolean,
@@ -82,7 +95,12 @@ export const globalObjects = {
   JSON,
   console,
   Promise,
+  Uint16Array,
+  undefined,
+  this: undefined as any,
 };
+
+globalObjects.this = globalObjects;
 
 export const shouldWaitOnValuePhase = (node: ASTNode) =>
   node.type === 'Program' ||

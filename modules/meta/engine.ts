@@ -355,13 +355,13 @@ export function meta({
     }
   };
 
-  const updateStackState = (evaluation: Evaluation) => {
-    console.log(
-      evaluation.e.type,
-      evaluation.phase,
-      evaluation.e,
-      evaluation.env,
-    );
+  const interceptor = (evaluation: Evaluation) => {
+    // console.log(
+    //   evaluation.e.type,
+    //   evaluation.phase,
+    //   evaluation.e,
+    //   evaluation.env,
+    // );
 
     // @ts-ignore
     if (evaluation.config.external) return;
@@ -576,7 +576,7 @@ export function meta({
       {
         handleEvaluationEnd,
         asyncRuntime: execState.asyncRuntime,
-        interceptor: updateStackState,
+        interceptor: interceptor,
         interpreters: {
           prev: {
             values: getInterpreters(),

@@ -4,7 +4,7 @@ async function a() {
 }
 
 async function b() {
-  const r = await Promise.resolve('hi!');
+  const r = await Promise.resolve(0);
   return r;
 }
 
@@ -22,7 +22,7 @@ function d(v) {
 function e(v) {
   console.log('e', v);
 
-  return v + '!';
+  return v + 1;
 }
 
 r.then(c).then(d).catch(e).then(e);
@@ -30,6 +30,11 @@ r.then(c).then(d).catch(e).then(e);
 async function z(v) {
   return await Promise.resolve(v);
 }
+
+const s = z(0);
+s.then(() => console.log('z1'));
+s.then(() => console.log('z2'));
+
 function x() {
   let a = 1;
   function y(v) {
@@ -40,11 +45,3 @@ function x() {
 }
 
 x();
-
-async function z(v) {
-  return await Promise.resolve(v);
-}
-
-const s = z();
-s.then(() => console.log(1));
-s.then(() => console.log(2));

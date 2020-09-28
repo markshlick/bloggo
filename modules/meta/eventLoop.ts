@@ -110,32 +110,29 @@ export function eventLoop({
       id: state.idCtr++,
       name: `suspend ${stackFrame.fnName}()`,
       type: 'AwaitSuspend',
+      node,
       promise,
     };
+
+    const cbEntry = (fn) => ({
+      id: state.idCtr++,
+      name: `${stackFrame.fnName}() `,
+      type: 'AsyncFunction',
+      node,
+      fn,
+    });
 
     promise.then(
       (value: unknown) => {
         pull(state.inFlightPromises, p);
-        state.callbackQueue.push({
-          id: state.idCtr++,
-          name: `${stackFrame.fnName}() `,
-          type: 'AsyncFunction',
-          fn: () => {
-            c(value);
-          },
-        });
+        state.callbackQueue.push(cbEntry(() => c(value)));
         handleEvaluationEnd();
       },
       (error) => {
         pull(state.inFlightPromises, p);
-        state.callbackQueue.push({
-          id: state.idCtr++,
-          name: `${stackFrame.fnName}()`,
-          type: 'AsyncFunction',
-          fn: () => {
-            cerr(error);
-          },
-        });
+        state.callbackQueue.push(
+          cbEntry(() => cerr(error)),
+        );
         handleEvaluationEnd();
       },
     );

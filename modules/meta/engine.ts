@@ -18,7 +18,6 @@ import {
   EvaluationContext,
   Timeout,
   blockScopeTypes,
-  prettyBlockScopeTypeNames,
   NodeNames,
   BlockFrame,
   FrameMeta,
@@ -30,6 +29,10 @@ import {
   shouldSkipWaitOnEnterPhase,
   shouldWaitOnValuePhase,
 } from 'modules/meta/config';
+import {
+  formatBlockScopeName,
+  formatFnName,
+} from 'modules/meta/formatNodeName';
 
 const blankFrameState = () => ({
   origins: {},
@@ -49,6 +52,9 @@ const programFrame = (): StackFrame => ({
   id: '-1',
   name: '-1',
   sourceId: 'Program!',
+  node: {
+    type: 'Program',
+  },
 });
 
 export function meta({
@@ -370,18 +376,6 @@ export function meta({
     }
   };
 
-  const fnName = (evaluation: Evaluation) =>
-    evaluation.e?.e?.callee?.name ||
-    evaluation.e?.e?.id?.name ||
-    (evaluation.e?.e?.callee?.object
-      ? (evaluation.e?.e?.callee?.object.type === 'Super'
-          ? `<super>`
-          : evaluation.e?.e?.callee?.object.name) +
-        '.' +
-        evaluation.e?.e?.callee?.property.name
-      : '') ||
-    `<fn()>`;
-
   const recordBlock = (evaluation: Evaluation) => {
     const evaluationType = evaluation.e.type;
     if (blockScopeTypes.includes(evaluationType)) {
@@ -391,8 +385,7 @@ export function meta({
         const { flow } = execState;
 
         const block = {
-          // @ts-ignore
-          fnName: prettyBlockScopeTypeNames[evaluationType],
+          fnName: formatBlockScopeName(evaluation.e),
           id: `${stackFrame.id}-${flow.allBlocks.size}`,
           type: evaluation.e.type,
           sourceId: evaluation.e.range?.join(),
@@ -485,7 +478,9 @@ export function meta({
 
     const frame = {
       ...blankFrameState(),
-      fnName: fnName(evaluation),
+      fnName: evaluation.e.e
+        ? formatFnName(evaluation.e.e)
+        : `<fn>`,
       id,
       name: id,
       sourceId: metaFn?.range?.join(),

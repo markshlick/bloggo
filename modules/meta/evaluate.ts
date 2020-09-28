@@ -13,6 +13,7 @@ import {
   ErrorContinuation,
   Script,
 } from 'metaes/types';
+import { ParseOptions } from 'esprima';
 
 export function noop() {}
 
@@ -30,7 +31,11 @@ const parseAndEvaluate = (
 ) => {
   const scriptId = nextScriptId();
 
-  const opts = { jsx: true } as any;
+  const opts: ParseOptions = {
+    jsx: true,
+    // tokens: true,
+    comment: true,
+  };
 
   const script: Script = {
     source: input,

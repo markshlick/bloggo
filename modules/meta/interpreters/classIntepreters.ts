@@ -13,8 +13,11 @@ import {
   ErrorContinuation,
   Environment,
   EvaluationConfig,
+  Interpreter,
+  ASTNode,
 } from 'metaes/types';
 import { callcc } from 'metaes/callcc';
+import { isMetaFunction } from 'metaes/metafunction';
 
 export function ClassDeclaration(
   e: NodeTypes.ClassDeclaration,
@@ -456,3 +459,96 @@ export function Super(
     config,
   );
 }
+
+export const LocatedException = (
+  value: any,
+  location: ASTNode,
+) => <const>{ type: 'Error', value, location };
+
+export const NewExpression: Interpreter<NodeTypes.NewExpression> = (
+  e,
+  c,
+  cerr,
+  env,
+  config,
+) =>
+  evaluateArray(
+    e.arguments,
+    (args) => {
+      let calleeNode = e.callee;
+
+      switch (calleeNode.type) {
+        case 'MemberExpression':
+        case 'Identifier':
+        // @ts-ignore
+        case 'CallExpression':
+          evaluate(
+            calleeNode,
+            function (callee) {
+              if (isMetaFunction(callee)) {
+                const newThis = Object.create(
+                  callee.prototype,
+                );
+
+                evaluate(
+                  {
+                    type: 'Apply',
+                    fn: callee,
+                    args,
+                    thisValue: newThis,
+                    e,
+                  },
+                  (value) => {
+                    c(
+                      typeof value === 'object'
+                        ? value
+                        : newThis,
+                    );
+                  },
+                  cerr,
+                  env,
+                  config,
+                );
+              } else {
+                if (typeof callee !== 'function') {
+                  cerr(
+                    LocatedException(
+                      new TypeError(
+                        typeof callee +
+                          ' is not a function',
+                      ),
+                      e,
+                    ),
+                  );
+                } else {
+                  try {
+                    c(
+                      new (Function.prototype.bind.apply(
+                        callee,
+                        // @ts-ignore
+                        [undefined].concat(args),
+                      ))(),
+                    );
+                  } catch (error) {
+                    cerr(toException(error, calleeNode));
+                  }
+                }
+              }
+            },
+            cerr,
+            env,
+            config,
+          );
+          break;
+        default:
+          cerr(
+            NotImplementedException(
+              `${calleeNode['type']} type of callee is not supported yet.`,
+            ),
+          );
+      }
+    },
+    cerr,
+    env,
+    config,
+  );

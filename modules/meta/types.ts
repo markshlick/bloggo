@@ -18,16 +18,6 @@ export const blockScopeTypes = [
   'WhileStatement',
 ] as const;
 
-export const prettyBlockScopeTypeNames: {
-  [name in typeof blockScopeTypes[number]]: string;
-} = {
-  IfStatement: 'if { }',
-  ForStatement: 'for { }',
-  ForInStatement: 'for { in }',
-  ForOfStatement: 'for { of }',
-  WhileStatement: 'while { }',
-};
-
 type AsyncRuntime = {
   enqueueCallback: (...args: any[]) => void;
   registerPromise: (...args: any[]) => void;
@@ -83,6 +73,7 @@ export type StackFrame = {
   name: string;
   fnName: string;
   sourceId: string;
+  node: ASTNode;
 };
 
 export type WatchValues = Record<

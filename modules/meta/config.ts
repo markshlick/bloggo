@@ -10,6 +10,7 @@ import {
   CallExpression,
   SpreadElement,
   Super,
+  NewExpression,
 } from 'modules/meta/interpreters/classIntepreters';
 import {
   ArrowFunctionExpression,
@@ -41,6 +42,7 @@ export const interestingTypes: NodeNames[] = [
   'AwaitExpression',
   'Apply',
   'CatchClause',
+  'NewExpression',
 ];
 
 export const interpreters = {
@@ -61,6 +63,7 @@ export const interpreters = {
   CallExpression,
   SpreadElement,
   Super,
+  NewExpression,
   //
   SetValue,
   AssignmentExpression,

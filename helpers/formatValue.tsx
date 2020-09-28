@@ -15,25 +15,13 @@ export function formatValue(arg: unknown): string {
         : 'ReactElement'
     } />`;
   } else if (isArray(arg)) {
-    return isArray(arg[0])
-      ? `[...]`
-      : `[${(arg.length > 5
-          ? arg.slice(0, 5).concat('...')
-          : arg
-        )
-          .map(formatValue)
-          .join(', ')}]`;
+    return `[]`;
   } else if (isObject(arg)) {
-    const entries = Array.from(Object.entries(arg))
-      .map(([k, v]) => `${k}: ${formatValue(v)}`)
-      .join(', ');
-    return `${
-      arg.constructor.name === 'Object'
-        ? ''
-        : `#${arg.constructor.name}`
-    } ${entries ? `{${entries}}` : '{}'}`;
+    return arg.constructor.name === 'Object'
+      ? '{}'
+      : `#${arg.constructor.name}`;
   } else if (isDate(arg)) {
-    return `Date{${arg.toISOString()}}`;
+    return `Date(${arg.toISOString()})`;
   } else if (isString(arg)) {
     return `"${arg}"`;
   } else {

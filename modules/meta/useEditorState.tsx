@@ -358,12 +358,12 @@ export function useEditorState() {
     frame: StackFrame,
     context: EvaluationContext,
   ) => {
-    // console.log(
-    //   evaluation.e.type,
-    //   evaluation,
-    //   frame,
-    //   context,
-    // );
+    console.log(
+      evaluation.e.type,
+      evaluation,
+      frame,
+      context,
+    );
 
     if (evaluation.phase !== 'exit') {
       if (evaluation.e.loc) {
@@ -459,6 +459,12 @@ export function useEditorState() {
         const prevNodes = getFrameWidgets(frame);
         prevNodes?.forEach((node) => node.attach());
       }
+    } else if (
+      evaluation.e.type === 'AwaitExpression' &&
+      // @ts-ignore
+      evaluation.phase === 'resume'
+    ) {
+      clearPreviousCallsForFrameFn(frame);
     } else if (
       evaluation.e.type === 'Apply' &&
       // @ts-ignore

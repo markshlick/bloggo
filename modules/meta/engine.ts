@@ -567,12 +567,6 @@ export function meta({
   };
 
   const interceptor = (evaluation: Evaluation) => {
-    console.info(
-      evaluation.e.type,
-      evaluation.phase,
-      evaluation,
-    );
-
     // @ts-ignore
     if (evaluation.config.external) return;
 

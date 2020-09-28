@@ -50,7 +50,7 @@ export function createWidget(
   node: ASTNode,
   frame: StackFrame,
   cm: Editor,
-  p: Position,
+  position: Position,
   el: ReactElement,
 ): Widget {
   const display = () => {
@@ -71,7 +71,7 @@ export function createWidget(
     const remove = () => element.remove();
 
     const change = () => {
-      const pos = cm.charCoords(p, 'local');
+      const pos = cm.charCoords(position, 'local');
       const top = pos.top;
       const right = pos.right;
 
@@ -81,6 +81,8 @@ export function createWidget(
 
     return {
       node,
+      position,
+      el,
       attach,
       remove,
       change,
@@ -326,6 +328,7 @@ export function useEditorState() {
     node: ASTNode,
     frame: StackFrame,
     value: string,
+    type: string,
   ) => {
     const loc = astToCmLoc(node);
     if (!loc || !editorRef.current) return;
@@ -397,6 +400,7 @@ export function useEditorState() {
         evaluation.e,
         frame,
         `= ${formatValue(evaluation.value)}`,
+        'assign',
       );
 
       if (context.origin) {
@@ -404,6 +408,7 @@ export function useEditorState() {
           context.origin.node,
           context.origin.frame,
           `= ${formatValue(evaluation.value)}`,
+          'assign',
         );
       }
     } else if (
@@ -425,6 +430,7 @@ export function useEditorState() {
         evaluation.e,
         frame,
         `= ${formatValue(evaluation.value)}`,
+        'assign',
       );
     } else if (
       evaluation.e.type === 'ReturnStatement' &&
@@ -436,6 +442,7 @@ export function useEditorState() {
         evaluation.e,
         frame,
         `⇐ ${formatValue(evaluation.value?.value)}`,
+        'resume',
       );
     } else if (
       evaluation.e.type === 'ExpressionStatement' &&
@@ -447,6 +454,7 @@ export function useEditorState() {
         evaluation.e,
         frame,
         `= ${formatValue(evaluation.value?.value)}`,
+        'assign',
       );
     } else if (
       evaluation.e.type === 'Apply' &&
@@ -493,6 +501,7 @@ export function useEditorState() {
           metaFn,
           frame,
           `(${formatArgs(evaluation.e.args)})`,
+          'args',
         );
 
         markEditor({

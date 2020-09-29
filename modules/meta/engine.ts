@@ -5,6 +5,7 @@ import {
   EvaluationConfig,
   Evaluation,
   Interpreter,
+  ASTNode,
 } from 'metaes/types';
 import { JavaScriptASTNode } from 'metaes/nodeTypes';
 import { getMetaFunction } from 'metaes/metafunction';
@@ -34,20 +35,7 @@ import {
   formatFnName,
 } from 'modules/meta/formatNodeName';
 
-const blankFrameState = () => ({
-  origins: {},
-  args: [],
-  calls: [],
-  children: [],
-  values: {},
-  allBlocks: [],
-  blockStack: [],
-  hasReturned: false,
-  returnValue: undefined,
-});
-
 const programFrame = (): StackFrame => ({
-  ...blankFrameState(),
   fnName: 'Program',
   id: '-1',
   name: '-1',
@@ -171,6 +159,7 @@ export function meta({
           node.type === 'AssignmentExpression' &&
           node.left.type === 'Identifier'
         ) {
+          recordAssignment(node, r);
           context.origin = getOrigin(node.left.name);
         }
 
@@ -356,7 +345,7 @@ export function meta({
     return b;
   };
 
-  const getOrigin = (name: string) => {
+  const getOrigin = (identifier: string) => {
     for (
       let index = execState.stackFrames.length - 1;
       index >= 0;
@@ -365,7 +354,7 @@ export function meta({
       const frame = execState.stackFrames[index].frame;
       const node = execState.flow.frameMeta
         .get(frame.id)
-        ?.origins.get(name);
+        ?.origins.get(identifier);
 
       if (node) {
         return {
@@ -447,6 +436,7 @@ export function meta({
   const createFrameMeta = (args?: any): FrameMeta => ({
     args,
     origins: new Map(),
+    assignments: new Map(),
     blocks: [] as string[],
     calls: [] as string[],
     returnValue: undefined,
@@ -460,13 +450,13 @@ export function meta({
     currentBlock?: BlockFrame,
   ) => {
     const { flow } = execState;
+    flow.allFrames.set(frame.id, frame);
     flow.frameMeta.set(frame.id, createFrameMeta(args));
     flow.frameMeta.get(prevFrame.id)?.calls.push(frame.id);
     currentBlock &&
       flow.frameMeta
         .get(currentBlock.id)
         ?.calls.push(frame.id);
-    flow.allFrames.set(frame.id, frame);
   };
 
   const createFrame = (
@@ -477,7 +467,6 @@ export function meta({
     const id = `${execState.flow.allFrames.size}`;
 
     const frame = {
-      ...blankFrameState(),
       fnName: evaluation.e.e
         ? formatFnName(evaluation.e.e)
         : `<fn>`,
@@ -540,6 +529,45 @@ export function meta({
     }
   };
 
+  const updateAssignments = (
+    id: string,
+    node: ASTNode,
+    value: any,
+  ) => {
+    const { flow } = execState;
+    const idenName = node.left.name;
+
+    const assignmentsMap = flow.frameMeta.get(id)
+      ?.assignments;
+
+    if (assignmentsMap) {
+      const nextVal = [
+        ...(assignmentsMap.get(idenName) ?? []),
+        {
+          node,
+          value,
+        },
+      ];
+      assignmentsMap.set(idenName, nextVal);
+    }
+  };
+
+  const recordAssignment = (node: ASTNode, value: any) => {
+    const frame = currentFrame();
+    const block = currentBlock();
+    const assignment = node;
+
+    if (
+      assignment.left &&
+      assignment.left.type === 'Identifier'
+    ) {
+      updateAssignments(frame.id, assignment, value);
+      if (block) {
+        updateAssignments(block.id, assignment, value);
+      }
+    }
+  };
+
   const recordOrigin = (evaluation: Evaluation) => {
     const { flow } = execState;
 
@@ -557,11 +585,11 @@ export function meta({
         const name = declaration.id.name;
         flow.frameMeta
           .get(frame.id)
-          ?.origins.set(name, evaluation.e);
+          ?.origins.set(name, declaration);
         block &&
           flow.frameMeta
             .get(block.id)
-            ?.origins.set(name, evaluation.e);
+            ?.origins.set(name, declaration);
       }
     }
   };
@@ -599,6 +627,13 @@ export function meta({
 
     clearState();
     const rootFrame = programFrame();
+
+    execState.flow.allFrames.set(rootFrame.id, rootFrame);
+    execState.flow.frameMeta.set(
+      rootFrame.id,
+      createFrameMeta(),
+    );
+
     execState.stackFrames = [
       { frame: rootFrame, blockStack: [] },
     ];
@@ -615,10 +650,9 @@ export function meta({
     parseAndEvaluate(
       code,
       handleEvaluationEnd,
-      exceptionHandler,
+      handleEvaluationEnd,
       programEnv,
       {
-        handleEvaluationEnd,
         asyncRuntime: execState.asyncRuntime,
         interceptor: interceptor,
         interpreters: {
@@ -643,6 +677,7 @@ export function meta({
     }
 
     onPending();
+    update();
   };
 
   const endExec = () => {

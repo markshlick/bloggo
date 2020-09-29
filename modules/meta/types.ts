@@ -34,6 +34,7 @@ export type FrameMeta = {
   calls: string[];
   blocks: string[];
   origins: Map<string, ASTNode>;
+  assignments: Map<string, { node: ASTNode; value: any }[]>;
   hasReturned: boolean;
   returnValue: any;
   args: any[] | undefined;
@@ -68,7 +69,6 @@ export type BlockFrame = {
 };
 
 export type StackFrame = {
-  children: (BlockFrame | StackFrame)[];
   id: string;
   name: string;
   fnName: string;

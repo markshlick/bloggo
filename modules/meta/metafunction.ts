@@ -5,10 +5,7 @@ import {
   LocatedError,
 } from 'metaes/exceptions';
 import { FunctionNode } from 'metaes/nodeTypes';
-import {
-  markAsMetaFunction,
-  getMetaFunction,
-} from 'metaes/metafunction';
+import { markAsMetaFunction } from 'metaes/metafunction';
 import {
   Continuation,
   ErrorContinuation,
@@ -21,154 +18,6 @@ import * as NodeTypes from 'metaes/nodeTypes';
 export const ErrorSymbol = (typeof Symbol === 'function'
   ? Symbol
   : (_: string) => _)('__error__');
-
-const wrapHandler = (
-  handler: Function,
-  done: Function,
-  fail: Function,
-  promiseHandle: any,
-) => {
-  return (value: unknown) => {
-    if (!handler) {
-      return done(value);
-    }
-
-    const mfn = getMetaFunction(handler);
-
-    if (mfn) {
-      mfn.config.asyncRuntime.enqueueCallback(
-        handler,
-        [value],
-        done,
-        fail,
-        promiseHandle,
-        promiseHandle.name ?? `<fn>`,
-      );
-
-      return;
-    }
-
-    // TODO: handle external?
-    try {
-      const r = handler(value);
-      if (r && r.then) {
-        r.then(done, fail);
-      } else {
-        done(r);
-      }
-    } catch (error) {
-      fail(error);
-    }
-  };
-};
-
-const toPromiseHandle = (
-  kind: string,
-  dfd: ReturnType<typeof deferred>,
-  m?: Function,
-  n?: Function,
-) => {
-  const mfn1 = n ? getMetaFunction(n as Function) : null;
-  const mfn2 = m ? getMetaFunction(m as Function) : null;
-  let anyMfn = mfn1 ?? mfn2;
-
-  if (anyMfn) {
-    const argNames = [
-      ...(mfn1 ? mfn1.e?.id?.name || [`<fn>`] : []),
-      ...(mfn2 ? mfn2.e?.id?.name || [`<fn>`] : []),
-    ].join(', ');
-
-    const name = `${kind}(${argNames})`;
-
-    return anyMfn.config.asyncRuntime.registerPromise({
-      name,
-      type: kind,
-      promise: dfd.promise,
-    });
-  }
-};
-
-function deferred() {
-  let resolve: (v: unknown) => void,
-    reject: (v: unknown) => void;
-
-  const promise = new Promise((resolve_, reject_) => {
-    resolve = resolve_;
-    reject = reject_;
-  });
-
-  const _then = promise.then.bind(promise);
-  const _catch = promise.catch.bind(promise);
-
-  (promise as any).then = (
-    onfulfilled: any,
-    onrejected: any,
-  ) => {
-    const dfd = deferred();
-    const promiseHandle = toPromiseHandle(
-      'then',
-      dfd,
-      onfulfilled,
-      onrejected,
-    );
-
-    _then(
-      wrapHandler(
-        onfulfilled,
-        dfd.resolve,
-        dfd.reject,
-        promiseHandle,
-      ),
-      wrapHandler(
-        onrejected,
-        dfd.resolve,
-        dfd.reject,
-        promiseHandle,
-      ),
-    );
-
-    return dfd.promise;
-  };
-
-  promise.catch = (onRejected: any) => {
-    const dfd = deferred();
-
-    _catch(
-      wrapHandler(
-        onRejected,
-        dfd.resolve,
-        dfd.reject,
-        toPromiseHandle(
-          'catch',
-          dfd,
-          onRejected,
-          undefined,
-        ),
-      ),
-    );
-
-    return dfd.promise;
-  };
-
-  const deferredObj = {
-    done: false,
-    value: undefined as unknown,
-    error: undefined as unknown,
-    promise,
-    resolve: (v: unknown) => {
-      deferredObj.value = v;
-      resolve(v);
-      return promise;
-    },
-    reject: (v: unknown) => {
-      deferredObj.error = v;
-      reject(v);
-      return promise;
-    },
-  };
-
-  return deferredObj;
-}
 
 // TODO: move to interpreter style
 export const evaluateMetaFunction = (
@@ -225,9 +74,7 @@ export const evaluateMetaFunction = (
       }
     },
     () => {
-      let returnDeferred:
-        | ReturnType<typeof deferred>
-        | undefined;
+      let returnDeferred: any;
 
       return evaluate(
         e.body,
@@ -274,7 +121,7 @@ export const evaluateMetaFunction = (
             }
           } else if (exception.type === 'AwaitExpression') {
             // @ts-ignore
-            returnDeferred = deferred();
+            returnDeferred = config.asyncRuntime.deferred();
 
             c(returnDeferred.promise);
           } else {

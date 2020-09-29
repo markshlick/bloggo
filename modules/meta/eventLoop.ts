@@ -3,6 +3,7 @@
 
 import pull from 'lodash/pull';
 import remove from 'lodash/remove';
+import { getMetaFunction } from 'metaes/metafunction';
 
 import {
   Continuation,
@@ -10,6 +11,154 @@ import {
   ASTNode,
 } from 'metaes/types';
 import { StackFrame, Timeout } from 'modules/meta/types';
+
+const wrapHandler = (
+  handler: Function,
+  done: Function,
+  fail: Function,
+  promiseHandle: any,
+) => {
+  return (value: unknown) => {
+    if (!handler) {
+      return done(value);
+    }
+
+    const mfn = getMetaFunction(handler);
+
+    if (mfn) {
+      mfn.config.asyncRuntime.enqueueCallback(
+        handler,
+        [value],
+        done,
+        fail,
+        promiseHandle,
+        promiseHandle.name ?? `<fn>`,
+      );
+
+      return;
+    }
+
+    // TODO: handle external?
+    try {
+      const r = handler(value);
+      if (r && r.then) {
+        r.then(done, fail);
+      } else {
+        done(r);
+      }
+    } catch (error) {
+      fail(error);
+    }
+  };
+};
+
+const toPromiseHandle = (
+  kind: string,
+  dfd: ReturnType<typeof deferred>,
+  m?: Function,
+  n?: Function,
+) => {
+  const mfn1 = n ? getMetaFunction(n as Function) : null;
+  const mfn2 = m ? getMetaFunction(m as Function) : null;
+  let anyMfn = mfn1 ?? mfn2;
+
+  if (anyMfn) {
+    const argNames = [
+      ...(mfn1 ? mfn1.e?.id?.name || [`<fn>`] : []),
+      ...(mfn2 ? mfn2.e?.id?.name || [`<fn>`] : []),
+    ].join(', ');
+
+    const name = `${kind}(${argNames})`;
+
+    return anyMfn.config.asyncRuntime.registerPromise({
+      name,
+      type: kind,
+      promise: dfd.promise,
+    });
+  }
+};
+
+function deferred() {
+  let resolve: (v: unknown) => void,
+    reject: (v: unknown) => void;
+
+  const promise = new Promise((resolve_, reject_) => {
+    resolve = resolve_;
+    reject = reject_;
+  });
+
+  const _then = promise.then.bind(promise);
+  const _catch = promise.catch.bind(promise);
+
+  (promise as any).then = (
+    onfulfilled: any,
+    onrejected: any,
+  ) => {
+    const dfd = deferred();
+    const promiseHandle = toPromiseHandle(
+      'then',
+      dfd,
+      onfulfilled,
+      onrejected,
+    );
+
+    _then(
+      wrapHandler(
+        onfulfilled,
+        dfd.resolve,
+        dfd.reject,
+        promiseHandle,
+      ),
+      wrapHandler(
+        onrejected,
+        dfd.resolve,
+        dfd.reject,
+        promiseHandle,
+      ),
+    );
+
+    return dfd.promise;
+  };
+
+  promise.catch = (onRejected: any) => {
+    const dfd = deferred();
+
+    _catch(
+      wrapHandler(
+        onRejected,
+        dfd.resolve,
+        dfd.reject,
+        toPromiseHandle(
+          'catch',
+          dfd,
+          onRejected,
+          undefined,
+        ),
+      ),
+    );
+
+    return dfd.promise;
+  };
+
+  const deferredObj = {
+    done: false,
+    value: undefined as unknown,
+    error: undefined as unknown,
+    promise,
+    resolve: (v: unknown) => {
+      deferredObj.value = v;
+      resolve(v);
+      return promise;
+    },
+    reject: (v: unknown) => {
+      deferredObj.error = v;
+      reject(v);
+      return promise;
+    },
+  };
+
+  return deferredObj;
+}
 
 export function eventLoop({
   handleEvaluationEnd,
@@ -27,6 +176,7 @@ export function eventLoop({
     idCtr: 0,
     inFlightPromises: [],
     programTimers: [],
+    microtaskQueue: [],
     callbackQueue: [],
   };
 
@@ -89,7 +239,13 @@ export function eventLoop({
   };
 
   const handleTick = () => {
-    const nextCb = state.callbackQueue.shift();
+    let nextCb;
+
+    if (state.microtaskQueue.length) {
+      nextCb = state.microtaskQueue.shift();
+    } else if (state.callbackQueue.length) {
+      nextCb = state.callbackQueue.shift();
+    }
 
     if (nextCb !== undefined) {
       nextCb.fn();
@@ -125,12 +281,12 @@ export function eventLoop({
     promise.then(
       (value: unknown) => {
         pull(state.inFlightPromises, p);
-        state.callbackQueue.push(cbEntry(() => c(value)));
+        state.microtaskQueue.push(cbEntry(() => c(value)));
         handleEvaluationEnd();
       },
       (error) => {
         pull(state.inFlightPromises, p);
-        state.callbackQueue.push(
+        state.microtaskQueue.push(
           cbEntry(() => cerr(error)),
         );
         handleEvaluationEnd();
@@ -151,6 +307,7 @@ export function eventLoop({
     handleTick,
     enqueueCallback,
     registerPromise,
+    deferred,
     reset,
     actions: {
       setTimeout: _setTimeout,

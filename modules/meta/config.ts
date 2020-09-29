@@ -43,6 +43,7 @@ export const interestingTypes: NodeNames[] = [
   'Apply',
   'CatchClause',
   'NewExpression',
+  'ThrowStatement',
 ];
 
 export const interpreters = {
@@ -103,9 +104,9 @@ export const globalObjects = {
 globalObjects.this = globalObjects;
 
 export const shouldWaitOnValuePhase = (node: ASTNode) =>
-  node.type === 'Program' ||
   node.type === 'VariableDeclarator' ||
   node.type === 'AssignmentExpression' ||
+  node.type === 'ThrowStatement' ||
   // FIXME - override node types
   // @ts-ignore
   node.type === 'AwaitExpression';
@@ -123,6 +124,7 @@ export const shouldSkipWaitOnEnterPhase = (
     node.type === 'VariableDeclarator' ||
     node.type === 'ReturnStatement' ||
     node.type === 'AssignmentExpression' ||
+    node.type === 'ThrowStatement' ||
     // node.type === 'ExpressionStatement' ||
     // @ts-ignore
     node.type === 'AwaitExpression' ||

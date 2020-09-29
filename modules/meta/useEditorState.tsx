@@ -361,12 +361,12 @@ export function useEditorState() {
     frame: StackFrame,
     context: EvaluationContext,
   ) => {
-    console.log(
-      evaluation.e.type,
-      evaluation,
-      frame,
-      context,
-    );
+    // console.log(
+    //   evaluation.e.type,
+    //   evaluation,
+    //   frame,
+    //   context,
+    // );
 
     if (evaluation.phase !== 'exit') {
       if (evaluation.e.loc) {
@@ -376,6 +376,22 @@ export function useEditorState() {
     }
 
     if (
+      evaluation.value &&
+      (evaluation.value instanceof Error ||
+        evaluation.value.type === 'Error' ||
+        evaluation.value.type === 'ReferenceError')
+    ) {
+      displayInlineValue(
+        evaluation.e,
+        frame,
+        `!${evaluation.value.type}: ${
+          evaluation.value?.value?.message
+            ? `${evaluation.value?.value?.message}`
+            : ''
+        }`,
+        'error',
+      );
+    } else if (
       evaluation.e.type === 'Program' &&
       evaluation.phase === 'exit'
     ) {
@@ -442,19 +458,7 @@ export function useEditorState() {
         evaluation.e,
         frame,
         `⇐ ${formatValue(evaluation.value?.value)}`,
-        'resume',
-      );
-    } else if (
-      evaluation.e.type === 'ExpressionStatement' &&
-      evaluation.value?.type !== 'ThrowStatement' &&
-      !evaluation.value?.[ErrorSymbol] &&
-      evaluation.value?.value
-    ) {
-      displayInlineValue(
-        evaluation.e,
-        frame,
-        `= ${formatValue(evaluation.value?.value)}`,
-        'assign',
+        'return',
       );
     } else if (
       evaluation.e.type === 'Apply' &&

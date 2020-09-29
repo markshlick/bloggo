@@ -12,7 +12,7 @@ import { meta } from 'modules/meta/engine';
 import { StackFrame } from 'modules/meta/types';
 import { useEditorState } from 'modules/meta/useEditorState';
 
-import code from '!!raw-loader!samples/values';
+import code from '!!raw-loader!samples/assignment';
 
 const Tree = dynamic(import('react-d3-tree'), {
   ssr: false,
@@ -65,7 +65,7 @@ const AsyncTask = ({
       backgroundColor,
     }}
   >
-    <h4>{children}</h4>
+    <h4 className="no-space">{children}</h4>
   </div>
 );
 
@@ -293,6 +293,15 @@ export default function Meta() {
 
   const asyncItems = [
     // @ts-ignore
+    ...asyncRuntime.state.microtaskQueue.map(
+      // @ts-ignore
+      ({ name, id }) => (
+        <AsyncTask key={id} backgroundColor="lightgreen">
+          {name}
+        </AsyncTask>
+      ),
+    ),
+    // @ts-ignore
     ...asyncRuntime.state.callbackQueue.map(
       // @ts-ignore
       ({ name, id }) => (
@@ -326,7 +335,7 @@ export default function Meta() {
       <h3>The Event Loop</h3>
       <div
         style={{
-          height: '65px',
+          height: '60px',
           overflow: 'scroll',
           border: '1px lightgray solid',
           borderRadius: 4,
@@ -453,10 +462,26 @@ export default function Meta() {
 
   const runningState = () => {
     const { execState } = metaRef.current;
+    const {
+      microtaskQueue,
+      callbackQueue,
+      inFlightPromises,
+      programTimers,
+      // @ts-ignore
+    } = asyncRuntime.state;
+
+    const numPending =
+      microtaskQueue.length +
+      callbackQueue.length +
+      inFlightPromises.length +
+      programTimers.length;
+
     if (!execState.running) {
       return 'Not running';
     } else if (execState.autoStepping) {
       return 'Auto-stepping';
+    } else if (!execState.next && numPending > 0) {
+      return 'Pending';
     } else {
       return 'Running';
     }

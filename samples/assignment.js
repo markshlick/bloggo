@@ -8,8 +8,9 @@ a = 1;
 
 b = 2;
 
-function x() {
-  c = a + b;
+function x(z) {
+  c = a + b + z;
+  return c;
 }
 
-x();
+x(1);

@@ -11,6 +11,7 @@ import {
   ASTNode,
 } from 'metaes/types';
 import { StackFrame, Timeout } from 'modules/meta/types';
+import formatNodeName from './formatNodeName';
 
 const wrapHandler = (
   handler: Function,
@@ -225,7 +226,7 @@ export function eventLoop({
     state.callbackQueue.push({
       id: state.idCtr++,
       name: name,
-      type: `PromiseHandler`,
+      type: `PromiseHandle`,
       fn: () => runMetaFunction(fn, args, done, fail),
     });
 
@@ -272,7 +273,7 @@ export function eventLoop({
 
     const cbEntry = (fn) => ({
       id: state.idCtr++,
-      name: `${stackFrame.fnName}() `,
+      name: `resume ${formatNodeName(stackFrame.node)}()`,
       type: 'AsyncFunction',
       node,
       fn,

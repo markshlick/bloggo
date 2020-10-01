@@ -1,5 +1,9 @@
 import { ECMAScriptInterpreters } from 'metaes/interpreters';
-import { Evaluation, ASTNode } from 'metaes/types';
+import {
+  Evaluation,
+  ASTNode,
+  Environment,
+} from 'metaes/types';
 
 export type NodeNames =
   | keyof typeof ECMAScriptInterpreters.values
@@ -16,6 +20,8 @@ export const blockScopeTypes = [
   'ForInStatement',
   'ForOfStatement',
   'WhileStatement',
+  'TryStatement',
+  'CatchClause',
 ] as const;
 
 type AsyncRuntime = {
@@ -31,13 +37,21 @@ type AsyncRuntime = {
 };
 
 export type FrameMeta = {
+  node: ASTNode;
+  env: Environment | undefined;
   calls: string[];
   blocks: string[];
-  origins: Map<string, ASTNode>;
-  assignments: Map<string, { node: ASTNode; value: any }[]>;
+  origins: Record<string, { node: ASTNode; value: any }>;
+  allOrigins: Record<string, { node: ASTNode; value: any }>;
+  assignments: Record<
+    string,
+    { node: ASTNode; value: any }[]
+  >;
   hasReturned: boolean;
   returnValue: any;
   args: any[] | undefined;
+  parentCallId: string;
+  parentBlockId: string | undefined;
 };
 
 export type ExecState = {
@@ -48,32 +62,25 @@ export type ExecState = {
   speed: number;
   nextTimer?: number;
   next?: () => any;
-  allStackNodes: StackFrame[];
   programEnvKeys: string[];
   flow: {
     allFrames: Map<string, StackFrame>;
-    allBlocks: Map<string, BlockFrame>;
+    allBlocks: Map<string, StackFrame>;
     frameMeta: Map<string, FrameMeta>;
+    envFrames: Map<Environment, string>;
   };
   stackFrames: {
     frame: StackFrame;
-    blockStack: BlockFrame[];
+    blockStack: StackFrame[];
   }[];
-};
-
-export type BlockFrame = {
-  id: string;
-  type: typeof blockScopeTypes;
-  sourceId?: string;
-  node: ASTNode;
 };
 
 export type StackFrame = {
   id: string;
-  name: string;
-  fnName: string;
   sourceId: string;
   node: ASTNode;
+  parentCallId: string;
+  parentBlockId: string | undefined;
 };
 
 export type WatchValues = Record<
@@ -84,6 +91,7 @@ export type WatchValues = Record<
 export type Origin = {
   node: ASTNode;
   frame: StackFrame;
+  block: StackFrame | undefined;
 };
 
 export type EvaluationContext = {
@@ -97,6 +105,7 @@ export type Engine = {
   onEvaluation: (
     evaluation: Evaluation,
     frame: StackFrame,
+    blockFrame: StackFrame,
     context: EvaluationContext,
   ) => void;
   onPending: () => void;

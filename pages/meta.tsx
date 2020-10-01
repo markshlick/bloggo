@@ -3,16 +3,18 @@ import {
   useEffect,
   useRef,
   useState,
+  Fragment,
 } from 'react';
 import dynamic from 'next/dynamic';
 import { Editor } from 'codemirror';
 import Mousetrap from 'mousetrap';
 
 import { meta } from 'modules/meta/engine';
-import { StackFrame } from 'modules/meta/types';
+import { ExecState, StackFrame } from 'modules/meta/types';
 import { useEditorState } from 'modules/meta/useEditorState';
+import formatNodeName from 'modules/meta/formatNodeName';
 
-import code from '!!raw-loader!samples/assignment';
+import code from '!!raw-loader!samples/fibonacci';
 
 const Tree = dynamic(import('react-d3-tree'), {
   ssr: false,
@@ -38,13 +40,7 @@ const GraphNode = ({
 }: {
   nodeData?: StackFrame;
 }) => {
-  return (
-    <div>
-      {nodeData ? (
-        <strong>{nodeData?.fnName}</strong>
-      ) : null}
-    </div>
-  );
+  return <div />;
 };
 
 const AsyncTask = ({
@@ -81,9 +77,33 @@ const withKeyCapture = (fn: Function) => {
   };
 };
 
+type GraphNodeItem = {
+  id: string;
+  name: string;
+  children: GraphNodeItem[];
+};
+
+function buildCallGraph(
+  rootId: string,
+  flow: ExecState['flow'],
+) {
+  const makeNode = (id: string): GraphNodeItem => {
+    const r = flow.frameMeta.get(id)!;
+    return {
+      id,
+      name: formatNodeName(r.node),
+      children: r.calls.map((id) => makeNode(id)),
+    };
+  };
+
+  return [makeNode(rootId)];
+}
+
 export default function Meta() {
   const [_, forceUpdate] = useState({});
-  const update = () => forceUpdate({});
+  const update = () => {
+    forceUpdate({});
+  };
 
   useEffect(() => {
     Mousetrap.bind('mod+j', withKeyCapture(handleStep));
@@ -363,16 +383,12 @@ export default function Meta() {
         {[...stackFrames]
           .reverse()
           .map(({ frame, blockStack }, i) => {
-            const { id, fnName } = frame;
+            const { id, node: callNode } = frame;
 
             return (
-              <>
+              <Fragment key={`group-${id}`}>
                 {[...blockStack].reverse().map((block) => {
-                  const {
-                    id,
-                    // @ts-ignore
-                    fnName,
-                  } = block;
+                  const { id, node: blockNode } = block;
                   return (
                     <div
                       key={id}
@@ -386,7 +402,7 @@ export default function Meta() {
                     >
                       <h5 className="no-space">
                         [{stackFrames.length - i}]{' '}
-                        <em>{fnName}</em>
+                        <em>{formatNodeName(blockNode)}</em>
                       </h5>
                     </div>
                   );
@@ -403,10 +419,10 @@ export default function Meta() {
                 >
                   <h4 className="no-space">
                     [{stackFrames.length - i}]{' '}
-                    <em>{fnName}()</em>
+                    <em>{formatNodeName(callNode)}()</em>
                   </h4>
                 </div>
-              </>
+              </Fragment>
             );
           })}
       </div>
@@ -423,37 +439,25 @@ export default function Meta() {
           borderRadius: 4,
         }}
       >
-        {true ? (
+        {metaRef.current.execState.running ? (
           <Tree
             translate={{ x: 100, y: 100 }}
             zoom={0.5}
             orientation="vertical"
             transitionDuration={0}
             collapsible={false}
-            data={[
-              {
-                name: '1',
-                // @ts-ignore
-                fnName: 'hi',
-                get children() {
-                  return [
-                    {
-                      name: '2',
-                      fnName: 'hi',
-                      children: [],
-                    },
-                  ];
-                },
-              },
-            ]}
+            data={buildCallGraph(
+              '-1',
+              metaRef.current.execState.flow,
+            )}
             allowForeignObjects
-            nodeLabelComponent={{
-              foreignObjectWrapper: {
-                y: -14,
-                x: 15,
-              },
-              render: <GraphNode />,
-            }}
+            // nodeLabelComponent={{
+            //   foreignObjectWrapper: {
+            //     y: -14,
+            //     x: 15,
+            //   },
+            //   render: <GraphNode />,
+            // }}
           />
         ) : null}
       </div>
@@ -470,17 +474,17 @@ export default function Meta() {
       // @ts-ignore
     } = asyncRuntime.state;
 
-    const numPending =
-      microtaskQueue.length +
-      callbackQueue.length +
-      inFlightPromises.length +
-      programTimers.length;
+    const hasPending =
+      !!microtaskQueue.length ||
+      !!callbackQueue.length ||
+      !!inFlightPromises.length ||
+      !!programTimers.length;
 
     if (!execState.running) {
       return 'Not running';
     } else if (execState.autoStepping) {
       return 'Auto-stepping';
-    } else if (!execState.next && numPending > 0) {
+    } else if (!execState.next && hasPending) {
       return 'Pending';
     } else {
       return 'Running';
@@ -521,7 +525,7 @@ export default function Meta() {
         }}
       >
         {stackFramesEl}
-        {/* {callGraphEl} */}
+        {callGraphEl}
       </div>
     </div>
   );

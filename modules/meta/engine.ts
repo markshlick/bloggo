@@ -20,8 +20,8 @@ import {
   Timeout,
   blockScopeTypes,
   NodeNames,
-  BlockFrame,
   FrameMeta,
+  Origin,
 } from 'modules/meta/types';
 import {
   getInterpreters,
@@ -30,19 +30,16 @@ import {
   shouldSkipWaitOnEnterPhase,
   shouldWaitOnValuePhase,
 } from 'modules/meta/config';
-import {
-  formatBlockScopeName,
-  formatFnName,
-} from 'modules/meta/formatNodeName';
+import { getEnvironmentForValue } from 'metaes/environment';
 
 const programFrame = (): StackFrame => ({
-  fnName: 'Program',
   id: '-1',
-  name: '-1',
   sourceId: 'Program!',
   node: {
     type: 'Program',
   },
+  parentBlockId: undefined,
+  parentCallId: '-2',
 });
 
 export function meta({
@@ -60,7 +57,7 @@ export function meta({
     next: undefined,
     nextTimer: undefined,
     programEnvKeys: [],
-    allStackNodes: [],
+    stackFrames: [],
     asyncRuntime: eventLoop({
       runMetaFunction: (
         fn: Function,
@@ -74,19 +71,23 @@ export function meta({
       allBlocks: new Map(),
       allFrames: new Map(),
       frameMeta: new Map(),
+      envFrames: new Map(),
     },
-    stackFrames: [],
   };
 
   const emitEvaluation = (
     evaluation: Evaluation,
-    frame: StackFrame,
     context: EvaluationContext,
   ) => {
     // @ts-ignore
     if (!evaluation.config.external) {
       try {
-        onEvaluation(evaluation, frame, context);
+        onEvaluation(
+          evaluation,
+          currentFrame(),
+          currentBlock(),
+          context,
+        );
       } catch (error) {}
     }
   };
@@ -160,7 +161,14 @@ export function meta({
           node.left.type === 'Identifier'
         ) {
           recordAssignment(node, r);
-          context.origin = getOrigin(node.left.name);
+
+          const origin = getOrigin(env, node.left.name);
+
+          context.origin = origin;
+        }
+
+        if (node.type === 'VariableDeclarator') {
+          recordOrigin(node, r);
         }
 
         emitEvaluation(
@@ -172,7 +180,6 @@ export function meta({
             config,
             env,
           },
-          currentFrame(),
           context,
         );
 
@@ -221,11 +228,7 @@ export function meta({
             (value: any) => {
               execState.stackFrames = frames;
               update();
-              emitEvaluation(
-                resumeEvaluation,
-                currentFrame(),
-                {},
-              );
+              emitEvaluation(resumeEvaluation, {});
               enqueue(() => {
                 execState.next = undefined;
                 c(value);
@@ -234,11 +237,7 @@ export function meta({
             (value: any) => {
               execState.stackFrames = frames;
               update();
-              emitEvaluation(
-                resumeEvaluation,
-                currentFrame(),
-                {},
-              );
+              emitEvaluation(resumeEvaluation, {});
               enqueue(() => {
                 execState.next = undefined;
                 cerr({
@@ -265,7 +264,6 @@ export function meta({
               config,
               env,
             },
-            currentFrame(),
             {},
           );
 
@@ -335,34 +333,31 @@ export function meta({
   };
 
   const currentBlock = () => {
-    const f =
+    const frame =
       execState.stackFrames[
         execState.stackFrames.length - 1
       ];
 
-    const b = f.blockStack[f.blockStack.length - 1];
-
-    return b;
+    return frame?.blockStack[frame.blockStack.length - 1];
   };
 
-  const getOrigin = (identifier: string) => {
-    for (
-      let index = execState.stackFrames.length - 1;
-      index >= 0;
-      index--
-    ) {
-      const frame = execState.stackFrames[index].frame;
-      const node = execState.flow.frameMeta
-        .get(frame.id)
-        ?.origins.get(identifier);
+  const getOrigin = (
+    env: Environment,
+    name: string,
+  ): Origin | undefined => {
+    const originEnv = getEnvironmentForValue(env, name);
+    if (!originEnv) return;
+    const frameId = execState.flow.envFrames.get(originEnv);
+    if (!frameId) return;
+    const frameMeta = execState.flow.frameMeta.get(frameId);
+    const block = execState.flow.allBlocks.get(frameId);
+    const frame = execState.flow.allFrames.get(
+      block ? block.parentCallId : frameId,
+    )!;
 
-      if (node) {
-        return {
-          node,
-          frame,
-        };
-      }
-    }
+    if (!frameMeta) return;
+    const { node } = frameMeta.origins[name];
+    return { block, frame, node };
   };
 
   const recordBlock = (evaluation: Evaluation) => {
@@ -373,15 +368,18 @@ export function meta({
         const prevBlock = currentBlock();
         const { flow } = execState;
 
-        const block = {
-          fnName: formatBlockScopeName(evaluation.e),
+        const block: StackFrame = {
           id: `${stackFrame.id}-${flow.allBlocks.size}`,
-          type: evaluation.e.type,
-          sourceId: evaluation.e.range?.join(),
+          sourceId: evaluation.e.range!.join(),
           node: evaluation.e,
+          parentBlockId: prevBlock?.id,
+          parentCallId: stackFrame.id,
         };
 
-        flow.frameMeta.set(block.id, createFrameMeta());
+        flow.frameMeta.set(
+          block.id,
+          createFrameMeta(evaluation.e, evaluation.env),
+        );
         prevBlock &&
           flow.frameMeta
             .get(prevBlock.id)
@@ -395,7 +393,7 @@ export function meta({
     }
   };
 
-  const pushBlockFrame = (block: BlockFrame) => {
+  const pushBlockFrame = (block: StackFrame) => {
     const lastFrame =
       execState.stackFrames[
         execState.stackFrames.length - 1
@@ -433,31 +431,23 @@ export function meta({
     execState.stackFrames = newStackFrames;
   };
 
-  const createFrameMeta = (args?: any): FrameMeta => ({
-    args,
-    origins: new Map(),
-    assignments: new Map(),
+  const createFrameMeta = (
+    node: ASTNode,
+    env: Environment | undefined,
+  ): FrameMeta => ({
+    node,
+    env,
+    args: node.args,
+    origins: {},
+    allOrigins: {},
+    assignments: {},
     blocks: [] as string[],
     calls: [] as string[],
     returnValue: undefined,
     hasReturned: false,
+    parentBlockId: currentBlock()?.id,
+    parentCallId: currentFrame().id,
   });
-
-  const recordCallMeta = (
-    args: any[],
-    prevFrame: StackFrame,
-    frame: StackFrame,
-    currentBlock?: BlockFrame,
-  ) => {
-    const { flow } = execState;
-    flow.allFrames.set(frame.id, frame);
-    flow.frameMeta.set(frame.id, createFrameMeta(args));
-    flow.frameMeta.get(prevFrame.id)?.calls.push(frame.id);
-    currentBlock &&
-      flow.frameMeta
-        .get(currentBlock.id)
-        ?.calls.push(frame.id);
-  };
 
   const createFrame = (
     evaluation: Evaluation,
@@ -467,16 +457,35 @@ export function meta({
     const id = `${execState.flow.allFrames.size}`;
 
     const frame = {
-      fnName: evaluation.e.e
-        ? formatFnName(evaluation.e.e)
-        : `<fn>`,
       id,
       name: id,
       sourceId: metaFn?.range?.join(),
       node: evaluation.e,
+      parentBlockId: currentBlock()?.id,
+      parentCallId: currentFrame().id,
     };
 
     return frame;
+  };
+
+  const recordCallMeta = (
+    node: ASTNode,
+    env: Environment | undefined,
+    prevFrame: StackFrame,
+    frame: StackFrame,
+    currentBlock?: StackFrame,
+  ) => {
+    const { flow } = execState;
+    flow.allFrames.set(frame.id, frame);
+    flow.frameMeta.set(
+      frame.id,
+      createFrameMeta(node, env),
+    );
+    flow.frameMeta.get(prevFrame.id)?.calls.push(frame.id);
+    currentBlock &&
+      flow.frameMeta
+        .get(currentBlock.id)
+        ?.calls.push(frame.id);
   };
 
   const recordCall = (evaluation: Evaluation) => {
@@ -484,7 +493,8 @@ export function meta({
       if (evaluation.phase === 'enter') {
         const frame = createFrame(evaluation);
         recordCallMeta(
-          evaluation.e.args,
+          evaluation.e,
+          evaluation.env,
           currentFrame(),
           frame,
         );
@@ -499,7 +509,6 @@ export function meta({
             // @ts-ignore
             phase: 'enter-after',
           },
-          currentFrame(),
           { previousFrame: prevFrame() },
         );
       } else {
@@ -517,7 +526,6 @@ export function meta({
             // @ts-ignore
             phase: 'exit-before',
           },
-          currentFrame(),
           { previousFrame: prevFrame() },
         );
 
@@ -529,33 +537,33 @@ export function meta({
     }
   };
 
-  const updateAssignments = (
-    id: string,
-    node: ASTNode,
-    value: any,
-  ) => {
-    const { flow } = execState;
-    const idenName = node.left.name;
-
-    const assignmentsMap = flow.frameMeta.get(id)
-      ?.assignments;
-
-    if (assignmentsMap) {
-      const nextVal = [
-        ...(assignmentsMap.get(idenName) ?? []),
-        {
-          node,
-          value,
-        },
-      ];
-      assignmentsMap.set(idenName, nextVal);
-    }
-  };
-
   const recordAssignment = (node: ASTNode, value: any) => {
     const frame = currentFrame();
     const block = currentBlock();
     const assignment = node;
+
+    const updateAssignments = (
+      id: string,
+      node: ASTNode,
+      value: any,
+    ) => {
+      const { flow } = execState;
+
+      const assignmentsMap = flow.frameMeta.get(id)
+        ?.assignments;
+
+      if (assignmentsMap) {
+        const nextVal = [
+          ...(assignmentsMap[node.range!.join()] ?? []),
+          {
+            node,
+            value,
+          },
+        ];
+
+        assignmentsMap[node.range!.join()] = nextVal;
+      }
+    };
 
     if (
       assignment.left &&
@@ -568,28 +576,43 @@ export function meta({
     }
   };
 
-  const recordOrigin = (evaluation: Evaluation) => {
+  const recordOrigin = (
+    declaration: ASTNode,
+    value: any,
+  ) => {
     const { flow } = execState;
-
+    const block = currentBlock();
+    const frame = currentFrame();
     if (
-      evaluation.phase === 'enter' &&
-      evaluation.e.type === 'VariableDeclarator'
+      declaration.id &&
+      declaration.id.type === 'Identifier'
     ) {
-      const frame = currentFrame();
-      const block = currentBlock();
-      const declaration = evaluation.e;
-      if (
-        declaration.id &&
-        declaration.id.type === 'Identifier'
-      ) {
-        const name = declaration.id.name;
-        flow.frameMeta
-          .get(frame.id)
-          ?.origins.set(name, declaration);
-        block &&
-          flow.frameMeta
-            .get(block.id)
-            ?.origins.set(name, declaration);
+      const name = declaration.id.name;
+      const frameMeta = flow.frameMeta.get(frame.id);
+      if (frameMeta) {
+        if (!block) {
+          frameMeta.origins[name] = {
+            node: declaration,
+            value,
+          };
+        }
+
+        frameMeta.allOrigins[name] = {
+          node: declaration,
+          value,
+        };
+      }
+
+      if (block) {
+        const blockOrigins = flow.frameMeta.get(block.id)
+          ?.origins;
+
+        if (blockOrigins) {
+          blockOrigins[name] = {
+            node: declaration,
+            value,
+          };
+        }
       }
     }
   };
@@ -600,14 +623,23 @@ export function meta({
 
     recordBlock(evaluation);
     recordCall(evaluation);
-    recordOrigin(evaluation);
+
+    if (
+      evaluation.env &&
+      !execState.flow.envFrames.has(evaluation.env)
+    ) {
+      execState.flow.envFrames.set(
+        evaluation.env,
+        currentBlock()?.id ?? currentFrame().id,
+      );
+    }
 
     const isInteresting = interestingTypes.includes(
       evaluation.e.type,
     );
 
     if (isInteresting) {
-      emitEvaluation(evaluation, currentFrame(), {
+      emitEvaluation(evaluation, {
         previousFrame: prevFrame(),
       });
       update();
@@ -616,6 +648,12 @@ export function meta({
 
   const clearState = () => {
     execState.stackFrames = [];
+    execState.flow = {
+      allBlocks: new Map(),
+      allFrames: new Map(),
+      frameMeta: new Map(),
+      envFrames: new Map(),
+    };
   };
 
   // exec
@@ -629,10 +667,20 @@ export function meta({
     const rootFrame = programFrame();
 
     execState.flow.allFrames.set(rootFrame.id, rootFrame);
-    execState.flow.frameMeta.set(
-      rootFrame.id,
-      createFrameMeta(),
-    );
+    execState.flow.frameMeta.set(rootFrame.id, {
+      node: { type: 'Program' },
+      env: undefined,
+      args: undefined,
+      origins: {},
+      allOrigins: {},
+      assignments: {},
+      blocks: [] as string[],
+      calls: [] as string[],
+      returnValue: undefined,
+      hasReturned: false,
+      parentBlockId: undefined,
+      parentCallId: '-2',
+    });
 
     execState.stackFrames = [
       { frame: rootFrame, blockStack: [] },

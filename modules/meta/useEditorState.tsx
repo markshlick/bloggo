@@ -6,13 +6,13 @@ import {
 import { render } from 'react-dom';
 import { Evaluation, ASTNode } from 'metaes/types';
 import { getMetaFunction } from 'metaes/metafunction';
+import { ErrorSymbol } from 'modules/meta/metafunction';
 import {
   TextMarker,
   Editor,
   LineWidget,
   Position,
 } from 'codemirror';
-import { ErrorSymbol } from 'modules/meta/metafunction';
 import {
   StackFrame,
   EvaluationContext,
@@ -359,6 +359,7 @@ export function useEditorState() {
   const onEvaluation = (
     evaluation: Evaluation,
     frame: StackFrame,
+    block: StackFrame,
     context: EvaluationContext,
   ) => {
     // console.log(

@@ -9,6 +9,8 @@ export const prettyBlockScopeTypeNames: {
   ForInStatement: 'for { in }',
   ForOfStatement: 'for { of }',
   WhileStatement: 'while { }',
+  CatchClause: 'catch { }',
+  TryStatement: 'try { }',
 };
 
 const dot = '.';
@@ -22,12 +24,12 @@ export const formatFnName = (node: ASTNode) => {
     node.callee.type === 'MemberExpression'
   ) {
     const { object, property } = node.callee;
-    let objectName;
+    let objectName = '';
     if (object.type === 'ThisExpression') {
       objectName = thisName;
     } else if (object.type === 'Super') {
       objectName = superName;
-    } else {
+    } else if (object.name) {
       objectName = object.name;
     }
     return `${objectName}${dot}${property.name}`;

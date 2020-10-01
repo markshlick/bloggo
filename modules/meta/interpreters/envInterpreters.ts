@@ -8,33 +8,13 @@ import {
 import * as NodeTypes from 'metaes/nodeTypes';
 import { evaluate } from 'metaes/evaluate';
 import { SetProperty } from 'metaes/interpreter/base';
+import { getEnvironmentForValue } from 'metaes/environment';
 
 type SetValueT<T> = {
   name: string;
   value: T;
   isDeclaration: boolean;
 };
-
-export function getEnvironmentBy(
-  env: Environment,
-  condition: (env: Environment) => boolean,
-): Environment | null {
-  let _env: Environment | undefined = env;
-  while (_env) {
-    if (condition(_env)) {
-      return _env;
-    }
-    _env = _env.prev;
-  }
-  return null;
-}
-
-export function getEnvironmentForValue(
-  env: Environment,
-  name: string,
-): Environment | null {
-  return getEnvironmentBy(env, (env) => name in env.values);
-}
 
 export function AssignmentExpression(
   e: NodeTypes.AssignmentExpression,

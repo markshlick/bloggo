@@ -18,7 +18,7 @@ class MyDocument extends Document {
 
   render() {
     return (
-      <Html>
+      <Html lang="en">
         <Head>
           <link
             rel="icon"
@@ -39,10 +39,14 @@ class MyDocument extends Document {
           />
           <meta
             name="viewport"
-            content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"
+            content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0"
           />
           <meta name="HandheldFriendly" content="true" />
           <meta charSet="UTF-8" />
+          <meta
+            name="Description"
+            content="Mark's internet zone."
+          />
           <script
             async
             defer

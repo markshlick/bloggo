@@ -6,9 +6,9 @@ export const title = 'mksh.io';
 
 export const moji = '🌲';
 
-export const what = 'indie-hacking';
+export const what = 'working on tools for better coding';
 
-export const where = 'Portland, Oregon';
+export const where = 'Orenco, Oregon';
 
 // files
 

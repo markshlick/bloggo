@@ -5,7 +5,7 @@ export default function About() {
     <>
       <h2>/about</h2>
       <p>
-        Hi, I'm <strong>Mark</strong>. 👋🏼 I'm a currently{' '}
+        Hi, I'm <strong>Mark</strong>. 👋🏼 I'm currently{' '}
         <strong>{what}</strong> in <strong>{where}</strong>.
       </p>
       <p>

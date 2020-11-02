@@ -90,7 +90,7 @@ function Header({
             <SpaceInline>
               <Link to={Pages.about()}>about</Link>
             </SpaceInline>
-            <>
+            {/* <>
               <ButtonUnstyled
                 onClick={() =>
                   onClickDarkModeToggle(!darkMode)
@@ -98,7 +98,7 @@ function Header({
               >
                 ☼
               </ButtonUnstyled>
-            </>
+            </> */}
           </Space>
         </Right>
         {/* {isAuthenticated ? (

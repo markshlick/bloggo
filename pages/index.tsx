@@ -44,7 +44,7 @@ export default function Home({ posts }: HomeProps) {
         {projects.map(({ name, url, description }) => (
           <div>
             <strong>
-              <a href={url} target="_blank">
+              <a href={url} target="_blank" rel="noopener">
                 {name}
               </a>
             </strong>

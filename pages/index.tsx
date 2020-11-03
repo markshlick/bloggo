@@ -39,20 +39,20 @@ const projects: {
 export default function Home({ posts }: HomeProps) {
   return (
     <>
-      <Section>
+      <Section key="projects">
         <h2>/projects/</h2>
         {projects.map(({ name, url, description }) => (
-          <div>
+          <Space key={name}>
             <strong>
               <a href={url} target="_blank" rel="noopener">
                 {name}
               </a>
             </strong>
             <p>{description}</p>
-          </div>
+          </Space>
         ))}
       </Section>
-      <Section>
+      <Section key="blog">
         <h2>/blog/</h2>
         <div>
           {posts.map(({ title, slug, tags }) => (
